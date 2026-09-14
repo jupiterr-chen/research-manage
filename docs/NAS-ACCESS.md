@@ -9,6 +9,7 @@
 | SSH 只读查看 TradingAgents 源码与数据 | `ssh chen@192.168.1.150 'cat /home/chen/docker/TradingAgents/tradingagents/graph/trading_graph.py'`、`ls data/logs`、`tail data/memory/trading_memory.md` |
 | 从 NAS 拷贝文件到本地 | `scp -r chen@192.168.1.150:/home/chen/docker/TradingAgents/tradingagents vendor/`(`vendor/` 已 gitignore) |
 | 查看 docker 状态 | `docker ps -a`、`docker image inspect tradingagents-tradingagents:latest`、`docker logs <本系统启动的容器>` |
+| 只读探查镜像内容 | `docker run --rm --network none --entrypoint python tradingagents-tradingagents:latest -c '…'`:**不挂任何卷、不传任何 env**,只打印包文件哈希/版本(`scripts/verify_vendor.sh`) |
 | 读写本系统自己的目录 | `/home/chen/docker/agents-manage/` 下任何操作(P3 阶段) |
 
 ## 禁止(任何情况下)

@@ -9,7 +9,7 @@ TradingAgents 研究任务管理台。FastAPI + Jinja2 + htmx + SQLite + APSched
 
 ## 🔴 红线
 
-1. **NAS 上的 TradingAgents 是共享生产依赖**:只读查看、不修改、不重启、不重建;真实运行需用户确认。全文见 [docs/NAS-ACCESS.md](docs/NAS-ACCESS.md)。开发与测试一律在本地用 `sim/` 仿真镜像。
+1. **NAS 上的 TradingAgents 是共享生产依赖**:只读查看、不修改、不重启、不重建;真实运行需用户确认。全文见 [docs/NAS-ACCESS.md](docs/NAS-ACCESS.md)。开发与测试在本地:错误注入用 `sim/` 仿真镜像,行为保真用 `tradingagents-local`(真实源码只读拷贝 + llm-stub),见 DESIGN §7.1。
 2. **管理台不接触 `.env`**:不读、不解析、不注入、不日志。`.env` 只作为 docker 挂载源路径字符串出现在 `app/executor/launcher.py`。[SPEC 约束 7]
 3. **docker-py 只在 Worker 线程调用**。Web/API 取消只置 `cancel_requested_at`。[DESIGN ADR-1]
 4. **SQLite 唯一事实源**:不加缓存副本、不用持久化 JobStore、不引入 ORM。[SPEC 约束 1]

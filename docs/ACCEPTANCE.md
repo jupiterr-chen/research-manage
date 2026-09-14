@@ -55,6 +55,7 @@ grep -r "FAKEKEY" .local/am-data/ app.log || echo "clean"
 - 步骤 a:`SIM_MODE=no_report` 发起 → 预期 `failed`,error 含 `investment_plan.md`
 - 步骤 b:`SIM_MODE=no_memory` 发起 → 预期 `failed`,error 含 `trading_memory`
 - 步骤 c:`SIM_MODE=ok` 发起 → 预期 `succeeded`,`report_ready=1`;`ta-data/logs/<code>/<date>/reports/investment_plan.md`、`memory/trading_memory.md` 含 `[<date> | <code> |`、`logs/<code>/TradingAgentsStrategy_logs/full_states_log_<date>.json` 三者齐全
+- 步骤 d(LOCAL-REAL,自动化 ✅ `-m real`):`tradingagents-local` + llm-stub,3 分析师与 4 分析师各跑一次 → 三产物齐全,`agents_total` 11/12
 - NAS:用户指定标的/日期真实跑一次,核对 c 的三产物 + 退出码 0
 - 证据:run 行、`ls` 输出、memory 行
 
@@ -109,7 +110,8 @@ grep -r "FAKEKEY" .local/am-data/ app.log || echo "clean"
 ### AM-11 🔴 runner 上游自检
 - 环境 LOCAL(自动化 ✅)+ NAS 形状测试
 - 步骤:`SIM_MODE=upstream_changed` 发起
-- 预期:容器退出码 2,status.json `error=upstream_api_changed`,run `failed` 且 error 相同;NAS:`tests/shape` 对 `vendor/tradingagents` 通过
+- 预期:容器退出码 2,status.json `error=upstream_api_changed`,run `failed` 且 error 相同
+- 对等(自动化 ✅):`scripts/verify_vendor.sh` 哈希一致 → `pytest tests/shape` 通过(8 个签名 + CLI 常量与 sim/models 一致)
 - 证据:run 行、pytest 输出
 
 ### AM-12 调度交易日语义
@@ -157,7 +159,7 @@ grep -r "FAKEKEY" .local/am-data/ app.log || echo "clean"
 
 | 步 | 操作 | 需用户确认 |
 |---|---|---|
-| 1 | `scripts/fetch_vendor.sh` 只读拷贝 `tradingagents/` 到本地 `vendor/`,跑 `tests/shape` | 否 |
+| 1 | `scripts/fetch_vendor.sh` + `scripts/verify_vendor.sh`(哈希一致)→ `pytest tests/shape` → `pytest -m real` | 否 |
 | 2 | `scripts/sync_to_nas.sh` 同步仓库到 `/home/chen/docker/agents-manage/` | 否(不触碰 TA 目录) |
 | 3 | NAS 上 `docker compose build`;`AM_BIND=127.0.0.1` 启动;`/healthz` 检查 docker/镜像/挂载 | 否 |
 | 4 | 添加用户指定的 1 个标的;手动发起(用户指定日期、分析师集合) | **是** |

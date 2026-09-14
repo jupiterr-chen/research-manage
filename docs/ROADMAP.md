@@ -63,8 +63,10 @@ p0-foundation ──┬── runner ─────────────┐
 | `sim/`(Dockerfile + 假包 + 8 种 SIM_MODE)+ `scripts/build_sim.sh` | R-RUN-08 |
 | `tests/unit/test_runner.py`(mock graph:成功/异常/SIGINT/自检失败/原子写) | R-RUN-02/04/06 |
 | `tests/integration/test_runner_sim.py`(在 sim 容器内跑 runner,断言 status.json/reports/memory/退出码) | R-RUN-03/08 |
-| `tests/shape/test_upstream_shape.py`(需 `vendor/`,无则 skip) + `scripts/fetch_vendor.sh`(只读 scp) | R-RUN-09 |
-| DoD:sim 8 种模式退出码与产物符合 SPEC §6.1/6.2 | |
+| `tests/shape/`(签名对等、常量对等;需 `vendor/`,无则 skip)+ `scripts/fetch_vendor.sh`(只读 scp)+ `scripts/verify_vendor.sh`(镜像哈希比对) | R-RUN-09/12 |
+| `sim/llm_stub/` + `scripts/build_local.sh`(用 vendor + 上游 Dockerfile 构建 `tradingagents-local:latest`)+ compose.local 的 `llm-stub` 服务 | R-RUN-10 |
+| `tests/integration/test_runner_real.py`(`-m real`) | R-RUN-11 |
+| DoD:sim 8 种模式退出码与产物符合 SPEC §6.1/6.2;`tests/shape` 对等通过;`-m real` 在 local 镜像上 3/4 分析师各 succeeded 且 resume 续跑 | |
 
 **`feat/executor`**
 
@@ -131,6 +133,7 @@ p0-foundation ──┬── runner ─────────────┐
 | M-A 契约冻结 | SPEC v1.1 + DESIGN §4 接口无 open 问题 |
 | M-B P0 合入 | develop 上 `python -m app.main` 可启动、/healthz 200 |
 | M-C 首次本地端到端 | develop 上用 sim 镜像手动发起 → succeeded,report ✓ |
+| M-C2 真实代码本地跑通 | `tradingagents-local` + llm-stub 上 runner succeeded,三产物齐全 |
 | M-D rc1 | 自动化验收全绿 |
 | M-E NAS 首跑 | 真实镜像一次 succeeded(双重判定通过) |
 | M-F 上线 | 3 个交易日调度稳定 |

@@ -335,6 +335,18 @@ main()
 - 镜像用户 `appuser` uid 1000,`WORKDIR /home/appuser/app`,ENTRYPOINT `tradingagents`(占位 shell),与真实镜像同形
 - `scripts/build_sim.sh` → `docker build -t tradingagents-sim:latest sim/`
 
+### 7.1 保真度:sim 如何保证与真实 API 一致(三层)
+
+| 层 | 手段 | 覆盖 | 依赖 NAS |
+|---|---|---|---|
+| L1 契约对等 | `tests/shape/`:`inspect.signature` 逐一比对 `vendor.tradingagents` 与 `sim.tradingagents` 的 8 个属性;CLI 常量与 `app/models.py` 比对 | API 形状 | 只读拷贝一次 |
+| L2 真实代码+假 LLM | `tradingagents-local:latest`(由 `vendor/` + 上游 Dockerfile 本地构建)+ `sim/llm_stub`(OpenAI 兼容 stub)。runner 跑的是真实 LangGraph/checkpointer/memory_log/报告目录,只有 LLM 是假的 | 行为、产物、断点续跑 | 只读拷贝一次 |
+| L3 真实运行 | P3 在 NAS 上跑一次用户指定的标的(需确认) | 端到端含真实 LLM 与数据源 | 是 |
+
+分工:**sim 镜像**只做错误注入(hang/fail/corrupt/no_memory…,秒级跑完);**local 镜像**做行为保真(分钟级);两者 runner 相同。
+`scripts/verify_vendor.sh` 用不挂卷、不传 env、`--network none` 的一次性容器读取镜像内包文件哈希,与 `vendor/` 比对,确保本地源码 = NAS 镜像内容(该操作属只读访问,见 NAS-ACCESS.md)。
+LLM stub 注意:不返回 `tool_calls`,分析师节点直接产出文本,避免真实数据源调用;`_resolve_pending_entries`/`resolve_instrument_context` 若触发 yfinance,依赖本机外网,失败时测试标注 `xfail(network)` 而非跳过整条链路。
+
 ## 8. 本地开发环境
 
 ```
@@ -359,7 +371,8 @@ Docker Desktop(Windows)的 bind 源路径用 `D:/x/y` 形式;docker-py 直接接
 | 单元 | `tests/unit/` | 无 | models/config/db/services/verdict/status_reader/scheduler(冻结时间)/auth/runner(mock graph) |
 | 集成 | `tests/integration/` | 本地 Docker + sim 镜像 | Worker 真启容器:ok/fail/hang+cancel/no_memory/corrupt_status/resume |
 | 验收 | `tests/acceptance/` | 同上 | 一一对应 ACCEPTANCE.md 的自动化项,`pytest -m acceptance` |
-| 形状 | `tests/shape/` | `vendor/tradingagents`(从 NAS 只读拷贝) | runner.self_check 对真实包通过 |
+| 形状 | `tests/shape/` | `vendor/`(从 NAS 只读拷贝) | sim 与真实包 8 个属性签名对等;CLI 常量对等 |
+| 真实 | `tests/integration/test_runner_real.py`(`-m real`) | `tradingagents-local:latest` + `llm-stub` | runner 在真实代码上产出三产物、断点续跑 |
 
 fake docker:`tests/conftest.py` 提供 `FakeLauncher`(实现 `DockerLauncher` 同接口,内存模拟容器生命周期与 status.json 写入),供 Worker 单测。
 
