@@ -91,7 +91,7 @@
 | R-RUN-09 | P0 | **契约对等测试** `tests/shape/`:`scripts/fetch_vendor.sh` 只读拷贝 NAS 的 `tradingagents/`、`cli/`、`Dockerfile`、`pyproject.toml`、`requirements.txt` 到 `vendor/`(gitignore);对 SPEC §6.1 的 8 个属性逐个用 `inspect.signature` 比对 `vendor.tradingagents` 与 `sim.tradingagents`,并比对 `cli/main.py` 中 `ANALYST_MAPPING`/`REPORT_SECTIONS`/`FIXED_AGENTS` 与 `app/models.py` 常量;任何不一致 → 测试失败 | AM-11 |
 | R-RUN-10 | P0 | **真实代码本地镜像** `tradingagents-local:latest`:用 `vendor/` 与其自带 Dockerfile 在本地构建(不改源码);`sim/llm_stub/` 提供 OpenAI 兼容 stub(`/v1/chat/completions`、`/v1/models`,返回含 `usage` 的固定文本,不返回 tool_calls;支持按 `SIM_MODE` 注入超时/5xx);`deploy/docker-compose.local.yml` 增加 `llm-stub` 服务;执行容器 env 由 `.local/ta.env` 提供,全部指向 stub(`TRADINGAGENTS_LLM_PROVIDER=openai_compatible`、`*_BACKEND_URL=http://llm-stub:8000/v1`、假 key) | AM-03/04/11 |
 | R-RUN-11 | P0 | 集成测试 `tests/integration/test_runner_real.py`(标 `@pytest.mark.real`):runner 在 `tradingagents-local` 上跑 3 分析师与 4 分析师各一次,断言 reports/*.md、memory 行、full_states_log 齐全,取消后 resume 从断点继续;无 `vendor/` 或镜像时 skip 并打印原因 | AM-03/04 |
-| R-RUN-12 | P0 | 镜像一致性校验 `scripts/verify_vendor.sh`:在 NAS 上 `docker run --rm --no-network --entrypoint python tradingagents-tradingagents:latest -c '<遍历包文件 sha256>'`(不挂卷、不传 env)与本地 `vendor/` 哈希比对;不一致则重新 fetch | AM-11 |
+| R-RUN-12 | P0 | 镜像一致性校验 `scripts/verify_vendor.sh`:在 NAS 上 `docker run --rm --network none --entrypoint python tradingagents-tradingagents:latest -c '<遍历包文件 sha256>'`(不挂卷、不传 env)与本地 `vendor/` 哈希比对;不一致则重新 fetch | AM-11 |
 
 ### M5 调度器(SCH)
 

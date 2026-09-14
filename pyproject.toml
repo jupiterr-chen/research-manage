@@ -23,6 +23,7 @@ testpaths = ["tests"]
 markers = [
   "docker: needs local Docker daemon and tradingagents-sim:latest image",
   "acceptance: acceptance cases mapped to docs/ACCEPTANCE.md",
-  "shape: needs vendor/tradingagents copied read-only from NAS",
+  "shape: needs vendor/ copied read-only from NAS (contract parity)",
+  "real: needs tradingagents-local:latest (built from vendor/) and llm-stub",
 ]
 addopts = "-ra"
