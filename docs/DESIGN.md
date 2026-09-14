@@ -107,6 +107,7 @@ uvicorn 主进程(单 worker)
 | `AM_RETENTION_DAYS` | `90` | |
 | `AM_STATUS_POLL_SECONDS` | `5` | |
 | `AM_STOP_TIMEOUT` | `20` | docker stop 宽限 |
+| `AM_TA_NETWORK` | 空 | 执行容器加入的 docker 网络;空 = 默认 bridge。本地开发填 compose 网络名,使执行容器能解析 `llm-stub` |
 | `AM_SIM_ENV` | 空 | **仅本地开发**:附加给执行容器的 env(如 `SIM_MODE=fail`),生产 MUST 为空 |
 | `TZ` | `Asia/Shanghai` | |
 
@@ -200,7 +201,7 @@ class DockerLauncher:
     def remove(self, container_id: str) -> None
 ```
 
-`start()` 生成的 `containers.run(...)` 参数(**逐项对应 SPEC §6.3**):`image`, `name=f"am-{run_id}"`, `entrypoint=["python","/runner.py"]`, `command=["--ticker",...]`, `working_dir=workdir`, `volumes={ta_data_host: {bind: ta_container_data, mode: "rw"}, ta_env_host: {bind: f"{workdir}/.env", mode: "ro"}, runner_host: {bind: "/runner.py", mode: "ro"}, workspace_host: {bind: "/ws", mode: "rw"}}`, `environment={"AM_RUN_ID": run_id, "TZ": ..., **extra_env}`, `stop_signal="SIGINT"`, `detach=True`, `labels={"am.run_id": run_id}`。`extra_env` 生产为空(`AM_SIM_ENV` 只在本地)。
+`start()` 生成的 `containers.run(...)` 参数(**逐项对应 SPEC §6.3**):`image`, `name=f"am-{run_id}"`, `entrypoint=["python","/runner.py"]`, `command=["--ticker",...]`, `working_dir=workdir`, `volumes={ta_data_host: {bind: ta_container_data, mode: "rw"}, ta_env_host: {bind: f"{workdir}/.env", mode: "ro"}, runner_host: {bind: "/runner.py", mode: "ro"}, workspace_host: {bind: "/ws", mode: "rw"}}`, `environment={"AM_RUN_ID": run_id, "TZ": ..., **extra_env}`, `stop_signal="SIGINT"`, `detach=True`, `labels={"am.run_id": run_id}`, `network=AM_TA_NETWORK or None`。`extra_env` 生产为空(`AM_SIM_ENV` 只在本地)。
 
 ### 4.6 `app/executor/status_reader.py`
 
@@ -345,7 +346,15 @@ main()
 
 分工:**sim 镜像**只做错误注入(hang/fail/corrupt/no_memory…,秒级跑完);**local 镜像**做行为保真(分钟级);两者 runner 相同。
 `scripts/verify_vendor.sh` 用不挂卷、不传 env、`--network none` 的一次性容器读取镜像内包文件哈希,与 `vendor/` 比对,确保本地源码 = NAS 镜像内容(该操作属只读访问,见 NAS-ACCESS.md)。
-LLM stub 注意:不返回 `tool_calls`,分析师节点直接产出文本,避免真实数据源调用;`_resolve_pending_entries`/`resolve_instrument_context` 若触发 yfinance,依赖本机外网,失败时测试标注 `xfail(network)` 而非跳过整条链路。
+LLM stub 注意:不返回 `tool_calls`,分析师节点直接产出文本;但 `_resolve_pending_entries`/`resolve_instrument_context`/缓存预热仍会直接调 yfinance,**外网访问必须经代理**。
+
+**代理(本机与 NAS 统一)**:`http://192.168.1.150:7890`。本地 L2 的执行容器 env(`.local/ta.env`)MUST 含:
+```
+HTTP_PROXY=http://192.168.1.150:7890
+HTTPS_PROXY=http://192.168.1.150:7890
+NO_PROXY=llm-stub,localhost,127.0.0.1,192.168.1.150
+```
+`NO_PROXY` 必须包含 `llm-stub`,否则对 stub 的请求会被转发到代理。NAS 生产环境的代理由 TradingAgents 自己的 `.env` 提供,本系统不介入。管理台自身不需要外网。
 
 ## 8. 本地开发环境
 
@@ -353,12 +362,22 @@ LLM stub 注意:不返回 `tool_calls`,分析师节点直接产出文本,避免�
 # 一次性
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt -r requirements-dev.txt
 scripts/build_sim.sh
-mkdir -p .local/ta-data .local/am-data && echo "SIM=1" > .local/ta.env
+mkdir -p .local/ta-data .local/am-data
+cat > .local/ta.env <<EOF      # 执行容器 env(sim 与 local 镜像共用;管理台不读)
+TRADINGAGENTS_LLM_PROVIDER=openai_compatible
+TRADINGAGENTS_LLM_BACKEND_URL=http://llm-stub:8000/v1
+OPENAI_COMPATIBLE_API_KEY=FAKEKEY_local
+TRADINGAGENTS_CHECKPOINT_ENABLED=true
+HTTP_PROXY=http://192.168.1.150:7890
+HTTPS_PROXY=http://192.168.1.150:7890
+NO_PROXY=llm-stub,localhost,127.0.0.1,192.168.1.150
+EOF
 # .env.local(不入库)
 AM_BIND=127.0.0.1  AM_TA_IMAGE=tradingagents-sim:latest
 AM_TA_DATA_DIR=D:/.../.local/ta-data   AM_TA_DATA_HOST=D:/.../.local/ta-data
 AM_DATA_DIR=D:/.../.local/am-data      AM_DATA_HOST=D:/.../.local/am-data
 AM_TA_ENV_HOST=D:/.../.local/ta.env    AM_RUNNER_HOST=D:/.../runner/runner.py
+AM_TA_NETWORK=research-manage_default   # compose.local 创建的网络,llm-stub 在其中
 # 运行(应用只读 OS 环境变量;dev.sh 负责 source .env.local)
 scripts/dev.sh
 ```

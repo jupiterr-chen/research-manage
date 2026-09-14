@@ -31,6 +31,10 @@ TradingAgents 研究任务管理台。FastAPI + Jinja2 + htmx + SQLite + APSched
 - 遇到 SPEC/DESIGN 没覆盖的决策:在 PR 描述里写明假设,不要静默选择;涉及 NAS 或用户数据的一律停下来问。
 - 报告工作结果时如实:测试没跑就说没跑,失败就贴输出。
 
+## 网络
+
+本机与 NAS 访问外网(yfinance 等)都必须经代理 `http://192.168.1.150:7890`。本地 L2 测试的执行容器 env 含 `HTTP(S)_PROXY` 与 `NO_PROXY=llm-stub,...`;管理台自身不需要外网;NAS 生产的代理由 TradingAgents 自己的 `.env` 提供。
+
 ## 常用命令
 
 ```bash

@@ -66,7 +66,7 @@
 | R-EXE-01 | P0 | 单工作线程,tick 1s;所有 docker-py 调用只在该线程 | AM-02 |
 | R-EXE-02 | P0 | 启动恢复:running 且容器不存在 → failed(`host_restarted`);容器仍存在 → 继续接管监控;queued 保留 | AM-09 |
 | R-EXE-03 | P0 | 启动自检:docker 可达、镜像存在、`AM_TA_DATA_DIR` 可读、`AM_DATA_DIR` 可写;失败 → 进程退出 | — |
-| R-EXE-04 | P0 | 启动执行容器:按 SPEC §6.3 的镜像/挂载/entrypoint/stop_signal/stop_timeout/working_dir;`environment` 只允许 `AM_RUN_ID`、`TZ`;挂载源全部来自 `AM_*_HOST` | AM-07 |
+| R-EXE-04 | P0 | 启动执行容器:按 SPEC §6.3 的镜像/挂载/entrypoint/stop_signal/stop_timeout/working_dir;`environment` 只允许 `AM_RUN_ID`、`TZ`(+ 本地 `AM_SIM_ENV`);挂载源全部来自 `AM_*_HOST`;`network=AM_TA_NETWORK`(空则默认 bridge) | AM-07 |
 | R-EXE-05 | P0 | 监控循环:`wait(timeout=5)`;每 5s 读 status.json 同步 `current_agent/agents_done/tokens_*`;半截/损坏 JSON → 保持上次值 + `status_stale=1`;`updated_at` 超过 `AM_STALE_MINUTES` → `status_stale=1`;恢复正常后清 0 | AM-08 |
 | R-EXE-06 | P0 | 取消:发现 `cancel_requested_at` → `container.stop(timeout=20)`(镜像 stop_signal=SIGINT)→ 终态 cancelled | AM-04 |
 | R-EXE-07 | P0 | 看门狗:`started_at` 超过 `AM_WATCHDOG_MINUTES` → 同取消流程,error=`watchdog_timeout`,status=cancelled | AM-05 |
@@ -89,7 +89,7 @@
 | R-RUN-07 | P0 | status.json 字段与 SPEC §6.2 完全一致;`agents_total = len(analysts)+8` | AM-16 |
 | R-RUN-08 | P0 | **仿真镜像 `sim/`**:`python:3.12-slim` + 假 `tradingagents` 包,API 表面与真实一致(8 个属性、`stream` 逐 chunk、写 memory/full_states_log、清断点);行为由 env `SIM_MODE` 控制:`ok | fail | hang | slow | no_memory | no_report | upstream_changed`,`SIM_STEP_SECONDS` 控制每节点耗时;镜像 tag `tradingagents-sim:latest` | 全部本地验收 |
 | R-RUN-09 | P0 | **契约对等测试** `tests/shape/`:`scripts/fetch_vendor.sh` 只读拷贝 NAS 的 `tradingagents/`、`cli/`、`Dockerfile`、`pyproject.toml`、`requirements.txt` 到 `vendor/`(gitignore);对 SPEC §6.1 的 8 个属性逐个用 `inspect.signature` 比对 `vendor.tradingagents` 与 `sim.tradingagents`,并比对 `cli/main.py` 中 `ANALYST_MAPPING`/`REPORT_SECTIONS`/`FIXED_AGENTS` 与 `app/models.py` 常量;任何不一致 → 测试失败 | AM-11 |
-| R-RUN-10 | P0 | **真实代码本地镜像** `tradingagents-local:latest`:用 `vendor/` 与其自带 Dockerfile 在本地构建(不改源码);`sim/llm_stub/` 提供 OpenAI 兼容 stub(`/v1/chat/completions`、`/v1/models`,返回含 `usage` 的固定文本,不返回 tool_calls;支持按 `SIM_MODE` 注入超时/5xx);`deploy/docker-compose.local.yml` 增加 `llm-stub` 服务;执行容器 env 由 `.local/ta.env` 提供,全部指向 stub(`TRADINGAGENTS_LLM_PROVIDER=openai_compatible`、`*_BACKEND_URL=http://llm-stub:8000/v1`、假 key) | AM-03/04/11 |
+| R-RUN-10 | P0 | **真实代码本地镜像** `tradingagents-local:latest`:用 `vendor/` 与其自带 Dockerfile 在本地构建(不改源码);`sim/llm_stub/` 提供 OpenAI 兼容 stub(`/v1/chat/completions`、`/v1/models`,返回含 `usage` 的固定文本,不返回 tool_calls;支持按 `SIM_MODE` 注入超时/5xx);`deploy/docker-compose.local.yml` 增加 `llm-stub` 服务;执行容器 env 由 `.local/ta.env` 提供,全部指向 stub(`TRADINGAGENTS_LLM_PROVIDER=openai_compatible`、`*_BACKEND_URL=http://llm-stub:8000/v1`、假 key),并含代理 `HTTP(S)_PROXY=http://192.168.1.150:7890`、`NO_PROXY=llm-stub,localhost,127.0.0.1,192.168.1.150`(yfinance 等外网数据源本机与 NAS 都必须经此代理);执行容器通过 `AM_TA_NETWORK` 加入 compose 网络以解析 `llm-stub` | AM-03/04/11 |
 | R-RUN-11 | P0 | 集成测试 `tests/integration/test_runner_real.py`(标 `@pytest.mark.real`):runner 在 `tradingagents-local` 上跑 3 分析师与 4 分析师各一次,断言 reports/*.md、memory 行、full_states_log 齐全,取消后 resume 从断点继续;无 `vendor/` 或镜像时 skip 并打印原因 | AM-03/04 |
 | R-RUN-12 | P0 | 镜像一致性校验 `scripts/verify_vendor.sh`:在 NAS 上 `docker run --rm --network none --entrypoint python tradingagents-tradingagents:latest -c '<遍历包文件 sha256>'`(不挂卷、不传 env)与本地 `vendor/` 哈希比对;不一致则重新 fetch | AM-11 |
 

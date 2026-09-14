@@ -11,7 +11,7 @@
 
 ```bash
 scripts/build_sim.sh                         # 构建 tradingagents-sim:latest
-mkdir -p .local/ta-data .local/am-data && echo "SIM=1" > .local/ta.env
+mkdir -p .local/ta-data .local/am-data          # .local/ta.env 按 DESIGN §8 写(含代理 192.168.1.150:7890 与 NO_PROXY=llm-stub)
 cp deploy/.env.example .env.local            # 按 DESIGN §8 填 AM_*,AM_TA_IMAGE=tradingagents-sim:latest
 python -m app.main                           # 或 docker compose -f deploy/docker-compose.local.yml up
 ```
