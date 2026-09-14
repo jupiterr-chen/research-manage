@@ -3,6 +3,8 @@
 TradingAgents 研究任务管理台。FastAPI + Jinja2 + htmx + SQLite + APScheduler + docker-py;
 每个研究任务 = 一个从 `tradingagents-tradingagents:latest` 镜像启动的兄弟容器,容器内跑本仓库的 `runner/runner.py`。
 
+**如果你是被派来做开发的 agent:先读 [docs/AGENT-PLAYBOOK.md](docs/AGENT-PLAYBOOK.md),它告诉你现在该做哪一步。**
+
 **先读**:[SPEC.md](SPEC.md)(契约)→ [docs/DESIGN.md](docs/DESIGN.md)(接口)→ [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)(你要做的 R-ID)→ [docs/ROADMAP.md](docs/ROADMAP.md)(你的分支)→ [docs/NAS-ACCESS.md](docs/NAS-ACCESS.md)(红线)。
 
 ---
