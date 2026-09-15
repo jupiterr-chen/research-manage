@@ -1,7 +1,8 @@
 """create_app()、lifespan、异常边界、/healthz(DESIGN §4.10 / R-FND-08/09)。
 
-Worker 与 Scheduler 在 P0 阶段为 stub(DESIGN §4.8/§4.9 接口面),
-通过 create_app(..., worker=..., scheduler=...) 注入,S3/S4 替换为真实实现。
+Worker 为真实实现(S3);Scheduler 为 stub(S4 替换)。
+均可通过 create_app(..., worker=..., scheduler=...) 注入(测试用)。
+lifespan 启动顺序:migrate → worker 自检(失败拒绝启动,R-EXE-03)→ start。
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 from app import db, models
 from app.audit import scrub
 from app.config import Settings
+from app.executor.launcher import DockerLauncher
 from app.executor.worker import Worker
 from app.scheduler import Scheduler
 from app.web import auth
@@ -50,6 +52,12 @@ def create_app(
             db.migrate(conn)
         finally:
             conn.close()
+        errors = app.state.worker.self_check()
+        if errors:
+            for line in errors:
+                print(f"[startup] 自检失败:{line}")
+            log.error("启动自检失败,拒绝启动:%s", errors)
+            raise SystemExit(2)
         app.state.scheduler.start()
         app.state.worker.start()
         log.info("agents-manage 启动完成,配置:%s", scrub(settings.summary()))
@@ -60,7 +68,11 @@ def create_app(
 
     app = FastAPI(title="Agents-Manage", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.settings = settings
-    app.state.worker = worker or Worker(settings, launcher=None, db_factory=db_factory)
+    app.state.worker = worker or Worker(
+        settings,
+        launcher=DockerLauncher(network=settings.ta_network),
+        db_factory=db_factory,
+    )
     app.state.scheduler = scheduler or Scheduler(settings, db_factory)
     app.state.templates = templates
 
