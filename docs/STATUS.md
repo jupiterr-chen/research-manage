@@ -6,8 +6,8 @@
 |---|---|---|---|---|---|
 | S1 | feat/p0-foundation | done | 1d1ebf2 | b57c45c (merge) | 2026-09-15 用户确认;4 项假设与 ruff 豁免均获认可 |
 | S2 | feat/runner | done | e89328f | 737d856 (merge) | 2026-09-15 用户确认;[interface] 常量修正获认可 |
-| S3 | feat/executor | awaiting_confirmation | a09719c | | 监控粒度重构为 tick=1s 切片 |
-| S4 | feat/scheduler | todo | | | |
+| S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
+| S4 | feat/scheduler | in_progress | | | |
 | S5 | feat/api-runs | todo | | | |
 | S6 | feat/web-ui | todo | | | |
 | S7 | feat/deploy | todo | | | |
