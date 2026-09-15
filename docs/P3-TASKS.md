@@ -12,7 +12,9 @@
 | T-03 | S3 | wontfix(用户 2026-09-15 决定) | S8 | worker 内部转移(看门狗/host_restarted)无审计留痕:SPEC 约束 8 的 actor 枚举无系统角色 | 若将来需要:SPEC actor 增加 `system`,属契约变更 | `app/executor/worker.py` |
 
 | T-04 | S3 | fixed(见下) | P3 部署 | compose 未设 `name:`,项目名取自目录 → 镜像/容器名为 `deploy-agents-manage*`,与 DEPLOY.md §5 的 `docker ps -qf name=agents-manage` 仍可匹配但易混淆 | compose 顶层 `name: agents-manage` | `deploy/docker-compose.yml` |
+| T-05 | S1 | fixed(部署脚本/文档;代码部分 open) | P3 首次部署 | NAS 首次 `up -d` 失败:`data/` 不存在时 docker 以 root 创建 bind 源目录,管理台(uid 1000)`unable to open database file`,容器反复重启 | ① `sync_to_nas.sh` 预建 `data/runs`(已修);DEPLOY §2/§7 补说明(已修);② **代码**:lifespan 应在连接 SQLite 前检查 `AM_DATA_DIR` 可写并给出中文原因后退出码 2(R-EXE-03 已要求,但 DB 连接发生在自检之前) | `scripts/sync_to_nas.sh`、`docs/DEPLOY.md`、`app/web/server.py::lifespan` |
 
 ## 记录
 
 - 2026-09-15 T-02、T-04:由验收方在 `release/v1.0` 直接修正(单行 compose 改动,不经开发 agent)。
+- 2026-09-15 T-05:现场处置 `down → rmdir data → mkdir -p data/runs → up`,管理台 healthy;脚本/文档已修,代码部分留给开发 agent。

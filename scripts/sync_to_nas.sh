@@ -33,4 +33,7 @@ else
   # 无 rsync(Git Bash)时用 tar 管道;不带 --delete,旧文件靠构建覆盖
   tar czf - "${EXCLUDES[@]}" . | ssh "$NAS" "mkdir -p '$DEST' && tar xzf - -C '$DEST'"
 fi
-echo "[sync_to_nas] 完成。下一步见 docs/DEPLOY.md §2(build + up)。"
+# data/ 必须由 chen 预先创建:否则 compose 首次 up 会以 root 创建 bind 源目录,
+# 管理台(uid 1000)无法写 SQLite → "unable to open database file"(T-05)
+ssh "$NAS" "mkdir -p '$DEST/data/runs'"
+echo "[sync_to_nas] 完成(已确保 $DEST/data 由当前用户创建)。下一步见 docs/DEPLOY.md §2(build + up)。"

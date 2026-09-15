@@ -41,6 +41,8 @@ bash scripts/sync_to_nas.sh
 ssh chen@192.168.1.150
 cd /home/chen/docker/agents-manage
 vim deploy/.env        # 与工作机同内容:AM_TOKEN / APP_UID / DOCKER_GID
+ls -ld data            # 必须已存在且 owner 为 chen(sync_to_nas.sh 已创建);若不存在,先 mkdir -p data/runs
+                       # 否则 compose 会以 root 创建 bind 源目录,管理台无法写 SQLite(T-05)
 docker compose -f deploy/docker-compose.yml build   # build-arg(APP_UID/DOCKER_GID)经 compose 从 .env 读取
 docker compose -f deploy/docker-compose.yml up -d
 
@@ -131,12 +133,13 @@ ssh chen@192.168.1.150 "cp /home/chen/docker/agents-manage/data/backup.db \
 常见错误:
 
 1. **启动即退出:「镜像不存在」**:`AM_TA_IMAGE` 指向的镜像不在本机(NAS 生产为 `tradingagents-tradingagents:latest`,本地为 `tradingagents-sim:latest`)。
-2. **启动即退出:「AM_TA_DATA_DIR 不可读」**:compose 的 `/ta-data:ro` 源路径写错,或 uid 无权穿透目录(`APP_UID` 与 §1 查询不一致)。
-3. **绑定门禁退出(退出码 2)**:`AM_BIND` 非回环而 `AM_TOKEN` 未设/短于 32 字符;确认 `deploy/.env` 位于 compose 文件同目录且被读取。
-4. **run 详情 `launch_failed:`**:多为挂载源(`AM_*_HOST`)在宿主上不存在;对照 SPEC §6.3 逐项检查。
-5. **退出码 0 但报告 ✗**:双重判定缺产物(investment_plan.md / memory 条目);run 详情 error 写明缺哪个,细节看 `container.log` 路径所指文件(经 SMB)。
-6. **`status_stale=1`**:status.json 超 `AM_STALE_MINUTES` 未更新或损坏;任务仍在跑等看门狗,进程已消失由 recover 判 `host_restarted`。
-7. **升级后 502 / 连不上**:`docker compose ps` + `docker compose logs agents-manage`;healthcheck 连续 3 次失败会标 unhealthy。
+2. **启动即退出:`sqlite3.OperationalError: unable to open database file`**:`data/` 由 docker 以 root 创建(首次 up 前未 mkdir)。`docker compose down` → `rmdir data`(空目录,父目录属 chen 可删)→ `mkdir -p data/runs` → `up -d`。
+3. **启动即退出:「AM_TA_DATA_DIR 不可读」**:compose 的 `/ta-data:ro` 源路径写错,或 uid 无权穿透目录(`APP_UID` 与 §1 查询不一致)。
+4. **绑定门禁退出(退出码 2)**:`AM_BIND` 非回环而 `AM_TOKEN` 未设/短于 32 字符;确认 `deploy/.env` 位于 compose 文件同目录且被读取。
+5. **run 详情 `launch_failed:`**:多为挂载源(`AM_*_HOST`)在宿主上不存在;对照 SPEC §6.3 逐项检查。
+6. **退出码 0 但报告 ✗**:双重判定缺产物(investment_plan.md / memory 条目);run 详情 error 写明缺哪个,细节看 `container.log` 路径所指文件(经 SMB)。
+7. **`status_stale=1`**:status.json 超 `AM_STALE_MINUTES` 未更新或损坏;任务仍在跑等看门狗,进程已消失由 recover 判 `host_restarted`。
+8. **升级后 502 / 连不上**:`docker compose ps` + `docker compose logs agents-manage`;healthcheck 连续 3 次失败会标 unhealthy。
 
 ## 附:本地全链路验证(compose.local)
 
