@@ -25,6 +25,7 @@ from app.config import Settings
 from app.executor.launcher import DockerLauncher
 from app.executor.worker import Worker
 from app.scheduler import Scheduler
+from app.services import schedules as services_schedules
 from app.web import auth
 from app.web.routes import pages
 
@@ -59,9 +60,12 @@ def create_app(
             log.error("启动自检失败,拒绝启动:%s", errors)
             raise SystemExit(2)
         app.state.scheduler.start()
+        # 调度表写操作 → 全量重建作业(DESIGN §4.9);关闭时解除接线
+        services_schedules.on_change = app.state.scheduler.rebuild_jobs
         app.state.worker.start()
         log.info("agents-manage 启动完成,配置:%s", scrub(settings.summary()))
         yield
+        services_schedules.on_change = None
         app.state.scheduler.shutdown()
         app.state.worker.stop()
         log.info("agents-manage 已停止(worker 与 scheduler;执行容器不受影响)")
