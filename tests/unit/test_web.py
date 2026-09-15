@@ -26,8 +26,8 @@ class TestAuthGate:
         assert r.status_code == 401
         assert r.json()["error"] == "unauthorized"
 
-    def test_local_mode_no_token_allows(self, make_settings, tmp_path):
-        app = create_app(make_settings(token=""))
+    def test_local_mode_no_token_allows(self, make_settings, tmp_path, fake_worker):
+        app = create_app(make_settings(token=""), worker=fake_worker(make_settings(token="")))
         with TestClient(app) as c:
             assert c.get("/").status_code == 200
             assert c.get("/healthz").status_code == 200
@@ -78,8 +78,8 @@ class TestLogin:
 
 
 class TestExceptionBoundary:
-    def test_api_500_json(self, settings):
-        app = create_app(settings)
+    def test_api_500_json(self, settings, fake_worker):
+        app = create_app(settings, worker=fake_worker(settings))
 
         @app.get("/api/v1/boom")
         async def boom():
@@ -92,8 +92,8 @@ class TestExceptionBoundary:
         assert r.json()["error"] == "internal"
         assert "secret-detail" not in r.text
 
-    def test_page_500_html(self, settings):
-        app = create_app(settings)
+    def test_page_500_html(self, settings, fake_worker):
+        app = create_app(settings, worker=fake_worker(settings))
 
         @app.get("/page-boom")
         async def page_boom():
@@ -122,8 +122,8 @@ class TestSkeleton:
     def test_instruments_placeholder(self, auth_client):
         assert auth_client.get("/instruments").status_code == 200
 
-    def test_lifespan_migrates_db(self, settings):
-        app = create_app(settings)
+    def test_lifespan_migrates_db(self, settings, fake_worker):
+        app = create_app(settings, worker=fake_worker(settings))
         with TestClient(app):
             pass  # startup 内 migrate;能起来即说明 schema 就绪
         import sqlite3
@@ -134,31 +134,39 @@ class TestSkeleton:
         assert {"instrument", "profile", "schedule", "run", "audit_log"} <= tables
 
 
-class TestStubs:
-    def test_worker_stub_health(self, settings, conn):
+class TestWorkerHealth:
+    def test_worker_health_shape_and_lifecycle(self, settings, conn, fake_launcher):
+        import time
+        from pathlib import Path
+
         from app.executor.worker import Worker
 
-        w = Worker(settings, launcher=None, db_factory=lambda: conn)
+        Path(settings.ta_data_dir).mkdir(parents=True, exist_ok=True)  # 自检要求目录存在
+        w = Worker(settings, launcher=fake_launcher, db_factory=lambda: conn)
         h = w.health()
         assert set(h) == {"alive", "docker_ok", "queue_depth", "current_run_id", "last_tick"}
-        assert h["docker_ok"] is None
+        assert h["docker_ok"] is None  # 未启动时未知
         w.start()
         try:
             assert w.health()["alive"] is True
+            deadline = time.time() + 3  # docker_ok 反映上一 tick,轮询等首个 tick
+            while time.time() < deadline and w.health()["docker_ok"] is None:
+                time.sleep(0.05)
+            assert w.health()["docker_ok"] is True
         finally:
             w.stop()
             w.join(timeout=5)
             assert not w.is_alive()
         assert w.health()["alive"] is False
 
-    def test_worker_stub_reads_queue_depth(self, settings, conn):
+    def test_worker_health_reads_queue_depth(self, settings, conn, fake_launcher):
         from app.executor.worker import Worker
         from app.services import instruments as inst_srv
         from app.services import runs as runs_srv
 
         inst_srv.create(conn, market="us", code="NVDA", actor="web")
         runs_srv.create_run(conn, code="NVDA", profile_id=1, trigger="web", actor="web")
-        w = Worker(settings, launcher=None, db_factory=lambda: conn)
+        w = Worker(settings, launcher=fake_launcher, db_factory=lambda: conn)
         h = w.health()
         assert h["queue_depth"] == 1 and h["current_run_id"] is None
 

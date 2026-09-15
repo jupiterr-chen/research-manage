@@ -492,9 +492,9 @@ def finalize(
     if status not in _TERMINAL_STATUS:
         raise ValidationError(f"finalize 只接受终态 {','.join(_TERMINAL_STATUS)},收到 {status!r}")
     with db.tx(conn):
+        # 不加 status='running' 守卫:launch_failed / host_restarted 需终结 queued/running
         conn.execute(
-            "UPDATE run SET status=?, exit_code=?, error=?, report_ready=?, finished_at=?"
-            " WHERE id=? AND status='running'",
+            "UPDATE run SET status=?, exit_code=?, error=?, report_ready=?, finished_at=? WHERE id=?",
             (status, exit_code, error, int(report_ready), _now(), run_id),
         )
 

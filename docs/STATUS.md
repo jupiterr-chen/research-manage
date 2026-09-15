@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | S1 | feat/p0-foundation | done | 1d1ebf2 | b57c45c (merge) | 2026-09-15 用户确认;4 项假设与 ruff 豁免均获认可 |
 | S2 | feat/runner | done | e89328f | 737d856 (merge) | 2026-09-15 用户确认;[interface] 常量修正获认可 |
-| S3 | feat/executor | in_progress | | | |
+| S3 | feat/executor | awaiting_confirmation | a09719c | | 监控粒度重构为 tick=1s 切片 |
 | S4 | feat/scheduler | todo | | | |
 | S5 | feat/api-runs | todo | | | |
 | S6 | feat/web-ui | todo | | | |
@@ -15,6 +15,18 @@
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S3 feat/executor — awaiting_confirmation(2026-09-15)
+
+- 交付:app/executor/{launcher,status_reader,verdict,worker,retention}.py(DESIGN §4.5~4.8 签名);
+  替换 S1 Worker stub;lifespan 自检失败拒绝启动;container.log scrub 落档;AM_SIM_ENV 注入;
+  FakeLauncher 补全(内存模拟容器生命周期 + status.json + TA 产物)。
+- 内部调整:runs.finalize 去掉 status='running' 守卫(launch_failed/host_restarted 需终结 queued);
+  DockerLauncher 增加可选 network 构造参数(AM_TA_NETWORK)。
+- 测试:unit 299(新增 worker 全链路 36 项)+ docker 集成 21(runner 11 + worker 10)全绿;
+  dev.sh 实跑 /healthz docker_ok=true。
+- 关键决策:监控循环改为每 tick wait(1s) 切片,使进度/取消/看门狗检查粒度=tick(否则 wait(5)
+  阻塞会错过 status.json 轮询窗口);sim 的断点开关经 AM_SIM_ENV 注入(生产走挂载 .env)。
 
 ### S2 feat/runner — awaiting_confirmation(2026-09-15)
 
