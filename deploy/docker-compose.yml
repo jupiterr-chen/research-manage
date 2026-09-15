@@ -1,6 +1,7 @@
 # 生产 compose(NAS /home/chen/docker/agents-manage/,SPEC §9 / R-DEP-02)
 # 用法:在同步目录根部执行 docker compose -f deploy/docker-compose.yml up -d
 # 挂载源均为宿主路径;./…、../… 相对本文件所在目录(deploy/)。
+name: agents-manage   # compose 项目名(否则默认取目录名 deploy;T-04)
 services:
   agents-manage:
     build:

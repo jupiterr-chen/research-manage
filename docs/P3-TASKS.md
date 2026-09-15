@@ -11,6 +11,8 @@
 | T-02 | S2 | fixed(见下) | P3 部署复核 | compose `ports: "8090:8090"` 发布在宿主全部接口(0.0.0.0),SPEC §8 要求局域网部署绑 `192.168.1.150` | `ports: "192.168.1.150:8090:8090"` | `deploy/docker-compose.yml` |
 | T-03 | S3 | wontfix(用户 2026-09-15 决定) | S8 | worker 内部转移(看门狗/host_restarted)无审计留痕:SPEC 约束 8 的 actor 枚举无系统角色 | 若将来需要:SPEC actor 增加 `system`,属契约变更 | `app/executor/worker.py` |
 
+| T-04 | S3 | fixed(见下) | P3 部署 | compose 未设 `name:`,项目名取自目录 → 镜像/容器名为 `deploy-agents-manage*`,与 DEPLOY.md §5 的 `docker ps -qf name=agents-manage` 仍可匹配但易混淆 | compose 顶层 `name: agents-manage` | `deploy/docker-compose.yml` |
+
 ## 记录
 
-- 2026-09-15 T-02:由验收方在 `release/v1.0` 直接修正(单行 compose 改动,不经开发 agent)。
+- 2026-09-15 T-02、T-04:由验收方在 `release/v1.0` 直接修正(单行 compose 改动,不经开发 agent)。
