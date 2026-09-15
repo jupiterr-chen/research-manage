@@ -8,13 +8,22 @@
 | S2 | feat/runner | done | e89328f | 737d856 (merge) | 2026-09-15 用户确认;[interface] 常量修正获认可 |
 | S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
-| S5 | feat/api-runs | in_progress | | | |
+| S5 | feat/api-runs | awaiting_confirmation | (本次提交) | | models 增补 code_market() 辅助 |
 | S6 | feat/web-ui | todo | | | |
 | S7 | feat/deploy | todo | | | |
 | S8 | feat/acceptance | todo | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S5 feat/api-runs — awaiting_confirmation(2026-09-15)
+
+- 交付:app/web/routes/api_runs.py 六端点(SPEC §5);业务全部委托 services.runs;
+  409 busy 体含 current{7 字段}+queued;already_done 含 run_id;artifacts 只回路径;
+  写操作 actor=api;models 增补 code_market()(400/404 分流,格式规则仍唯一来源)。
+- 测试:unit 346 全绿(新增 API 28 项:busy 体/already_done+force/非法参数矩阵/401 全端点/
+  cancel/resume 状态限制/artifacts 无内容);ruff 零告警(新增 flake8-bugbear
+  extend-immutable-calls 声明 FastAPI Depends 惯用法)。
 
 ### S4 feat/scheduler — awaiting_confirmation(2026-09-15)
 

@@ -27,7 +27,7 @@ from app.executor.worker import Worker
 from app.scheduler import Scheduler
 from app.services import schedules as services_schedules
 from app.web import auth
-from app.web.routes import pages
+from app.web.routes import api_runs, pages
 
 log = logging.getLogger("am.server")
 
@@ -82,6 +82,7 @@ def create_app(
 
     app.mount("/static", StaticFiles(directory=str(_WEB_DIR / "static")), name="static")
     app.include_router(pages.router)
+    app.include_router(api_runs.router)
 
     @app.get("/healthz", tags=["ops"])
     async def healthz(request: Request, _: None = Depends(auth.require_auth)) -> JSONResponse:
