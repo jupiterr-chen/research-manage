@@ -9,8 +9,8 @@
 | S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
 | S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
-| S6 | feat/web-ui | awaiting_confirmation | 3def42b | | 档案列只读展示(SPEC 未要求 CRUD UI) |
-| S7 | feat/deploy | todo | | | |
+| S6 | feat/web-ui | done | 67301e9 | 4a3f932 (merge) | 2026-09-15 用户确认 |
+| S7 | feat/deploy | in_progress | | | |
 | S8 | feat/acceptance | todo | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
