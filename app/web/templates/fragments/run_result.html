@@ -1,0 +1,14 @@
+<div id="run-result">
+  {% if ok %}
+  <p class="flash-ok">已入队 {{ run.id }}({{ run.code }} @ {{ run.date }},{{ run.analysts_list | length }} 分析师)。执行进度见下方。</p>
+  {% include "fragments/overview.html" %}
+  {% elif error == "busy" %}
+  <div class="flash-error">
+    <p><strong>当前忙,未发起:</strong>{{ current.code }} @ {{ current.date }} 正在执行
+      ({{ current.current_agent or "启动中" }},{{ current.agents_done }}/{{ current.agents_total }}),
+      其后还有 {{ queued }} 条排队。请等待完成后再发起。</p>
+  </div>
+  {% else %}
+  <div class="flash-error"><p><strong>发起失败:</strong>{{ message }}</p></div>
+  {% endif %}
+</div>

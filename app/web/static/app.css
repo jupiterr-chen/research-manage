@@ -152,3 +152,130 @@ th { color: var(--muted); font-weight: 600; }
   font: inherit;
   cursor: pointer;
 }
+
+/* ===== S6 web-ui 扩展 ===== */
+
+.flash-ok {
+  background: #f0fdf4;
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.chip {
+  display: inline-block;
+  font-size: 12px;
+  padding: 1px 8px;
+  margin-right: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.hint {
+  color: var(--warn);
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+}
+.badge.stale { border-color: var(--warn); color: var(--warn); }
+
+/* 状态圆点 */
+.dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 4px;
+}
+.dot-queued    { background: var(--warn); }
+.dot-running   { background: var(--accent); animation: pulse 1.5s infinite; }
+.dot-succeeded { background: var(--ok); }
+.dot-failed    { background: var(--bad); }
+.dot-cancelled { background: var(--muted); }
+.dot-muted     { background: var(--line); }
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+.ok-text { color: var(--ok); font-weight: 700; }
+
+/* 表单 */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 8px 0;
+}
+.form-row label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.form-row label.inline { flex-direction: row; align-items: center; }
+.form-row input[type="text"], .form-row input, .form-row select {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+.form-row button, .inst-actions button, .sched-ops button, .task-grid button {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.form-row button:hover, .inst-actions button:hover, .sched-ops button:hover { border-color: var(--accent); color: var(--accent); }
+.analyst-box { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+
+/* 当前任务卡 */
+.task-grid { display: grid; gap: 8px; }
+.task-grid .actions { display: flex; gap: 8px; }
+
+/* 标的卡 */
+.instruments-block .instrument-card h3 { margin: 0; font-size: 15px; }
+.inst-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inst-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.inst-actions form.inline, .sched-ops form.inline { display: inline; }
+.inst-actions .rename input { width: 110px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; }
+.profiles-line { margin: 8px 0; }
+.sched-table { margin-top: 8px; }
+.sched-ops { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sched-ops details, .add-sched-row details { text-align: left; }
+.sched-ops summary, .add-sched-row summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+.add-sched-row td { padding: 4px 10px; }
+
+/* Agent 时间线 */
+.timeline {
+  list-style: none;
+  margin: 0; padding: 0 0 0 6px;
+  border-left: 2px solid var(--line);
+}
+.timeline li {
+  position: relative;
+  padding: 4px 0 4px 18px;
+  color: var(--muted);
+}
+.timeline li .tl-marker {
+  position: absolute;
+  left: -7px; top: 9px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--line);
+  border: 2px solid var(--panel);
+}
+.timeline li.done { color: var(--ink); }
+.timeline li.done .tl-marker { background: var(--ok); }
+.timeline li.active { color: var(--ink); font-weight: 600; }
+.timeline li.active .tl-marker { background: var(--accent); }
+
+.run-title { font-size: 16px; margin: 4px 0 12px; word-break: break-all; }
+.fires { margin: 0; padding-left: 18px; }

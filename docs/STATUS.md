@@ -9,12 +9,21 @@
 | S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
 | S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
-| S6 | feat/web-ui | in_progress | | | |
+| S6 | feat/web-ui | awaiting_confirmation | 3def42b | | 档案列只读展示(SPEC 未要求 CRUD UI) |
 | S7 | feat/deploy | todo | | | |
 | S8 | feat/acceptance | todo | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S6 feat/web-ui — awaiting_confirmation(2026-09-15)
+
+- 交付:routes/fragments.py(overview/run/instruments/schedules/run_detail 全套)+ pages.py 三页首屏
+  + 全部模板(总览壳/overview 片段/run_result OOB/instruments_block/run_detail/时间线)+ CSS 扩展。
+- 硬规则落实:无外链(模板/CSS 扫描测试)、every 15s 无 WS/SSE、忙时 200 内联不跳转、
+  describe() 文案、周一冲突提示、agent_sequence 时间线、container.log 仅路径、取消 hx-confirm、
+  续跑仅 cancelled/failed、全站无 |safe(扫描测试)。
+- 测试:unit 372 全绿(新增 web-ui 26 项);ruff 零告警(Form 加入 immutable-calls);dev.sh 实跑三页 200。
 
 ### S5 feat/api-runs — awaiting_confirmation(2026-09-15)
 
