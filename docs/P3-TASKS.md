@@ -15,6 +15,7 @@
 | T-05 | S1 | fixed(部署脚本/文档;代码部分 open) | P3 首次部署 | NAS 首次 `up -d` 失败:`data/` 不存在时 docker 以 root 创建 bind 源目录,管理台(uid 1000)`unable to open database file`,容器反复重启 | ① `sync_to_nas.sh` 预建 `data/runs`(已修);DEPLOY §2/§7 补说明(已修);② **代码**:lifespan 应在连接 SQLite 前检查 `AM_DATA_DIR` 可写并给出中文原因后退出码 2(R-EXE-03 已要求,但 DB 连接发生在自检之前) | `scripts/sync_to_nas.sh`、`docs/DEPLOY.md`、`app/web/server.py::lifespan` |
 | T-06 | S1 | fixed(fix/T-06-workspace-host-path) | P3 第 4 步首次发起 | run 停在 queued:Worker 用 `AM_DATA_HOST`(宿主路径)在**容器内** mkdir 工作区 → `PermissionError: /home/chen`,每 tick 重抛。本地开发 HOST=DIR 故未被任何测试覆盖 | 工作区在 `AM_DATA_DIR/runs/<id>` 创建,`spec.workspace_host` 用 `AM_DATA_HOST` 拼接;新增单测强制 HOST≠DIR | `app/executor/worker.py::_launch_next` |
 | T-07 | S1 | fixed(fix/T-07-scrub-url-secrets) | P3 第 4 步失败落档 | **密钥泄漏到 `container.log`**:上游 TradingAgents 把 FRED 请求 URL(含 `api_key=<真实值>`)打进 stderr,`scrub()` 只处理字典键名与 `sk-*`,URL 查询串/键值对/Bearer 形式未遮蔽 → 违反 SPEC 约束 7 / AM-07 | `scrub_text()` 新增 `key=value`、`key: value`、JSON `"key": "v"`、`Bearer xxx` 遮蔽;回归测试用真实日志行形态;NAS 上已存在的 container.log 现场重新脱敏 | `app/audit.py` |
+| T-08 | S3 | open | P3 第 4 步 | 成功终态时 `current_agent` 停留在 `Aggressive Analyst`(12/12 已完成),不是最后一个节点 `Portfolio Manager` 或空;推测 runner 的 risk 团队三节点合并计数时未更新 current_agent | 终态 `phase=succeeded` 时 `current_agent` 置 null 或最后完成的 agent;页面显示"已完成" | `runner/runner.py` 状态映射 |
 
 ## 记录
 
