@@ -16,6 +16,15 @@
 
 ## 汇报摘要(每步一条,最新在上)
 
+### S8 feat/acceptance — awaiting_confirmation(2026-09-15)
+
+- 交付:tests/acceptance/ 34 项(LOCAL 全部自动化项 + AM-03d -m real);compose.local 全链路演练;
+  验收记录 docs/acceptance-records/2026-09-15-local.md(每条附证据)。
+- 测试:pytest -m acceptance 34 全绿(8:23,含真实栈);unit+shape 372 全绿;ruff 零告警。
+- 随分支修复(记录缺陷清单 #2/#3):verdict 缺项文案补 trading_memory.md;resume 端点拒绝多余字段。
+- 待用户拍板(#1):AM-05 手册预期 audit run.watchdog,但 SPEC 约束8 actor 枚举无系统角色——
+  worker 内部转移(看门狗/host_restarted)未留审计,是否扩枚举属 SPEC 变更。
+
 ### S7 feat/deploy — awaiting_confirmation(2026-09-15)
 
 - 交付:deploy/Dockerfile(python:3.12-slim、build-arg APP_UID/DOCKER_GID、非 root、无 node,
