@@ -323,3 +323,39 @@ class TestSelfCheck:
         settings, conn = exec_env
         w = make_worker(settings, conn, FakeLauncher())
         assert w.self_check() == []
+
+
+def test_workspace_created_under_data_dir_and_spec_uses_data_host(tmp_path, exec_env):
+    """T-06:生产中 AM_DATA_DIR(容器内)≠ AM_DATA_HOST(宿主);
+    工作区必须在 data_dir 下创建,spec.workspace_host 必须用 data_host 拼接,
+    且 worker 不得尝试在容器内创建宿主路径。"""
+    settings, conn = exec_env
+    host_view = tmp_path / "host-only" / "agents-manage" / "data"  # 容器内不存在的宿主路径
+    settings.data_host = str(host_view)
+
+    captured = {}
+
+    class CaptureLauncher(FakeLauncher):
+        def start(self, spec):
+            captured["spec"] = spec
+            raise RuntimeError("stop here")  # 只验证 spec,不真正模拟执行
+
+    run = runs_srv.create_run(
+        conn,
+        code="1810.HK",
+        market=None,
+        date="2026-09-15",
+        analysts=("market",),
+        profile_id=None,
+        trigger="api",
+        actor="api",
+    )
+    worker = make_worker(settings, conn, CaptureLauncher())
+    worker._launch_next()
+
+    spec = captured["spec"]
+    assert spec.workspace_host == str(host_view / "runs" / run["id"])
+    assert (Path(settings.data_dir) / "runs" / run["id"]).is_dir()
+    assert not host_view.exists()
+    row = runs_srv.get(conn, run["id"])
+    assert row["status"] == "failed" and row["error"].startswith("launch_failed")
