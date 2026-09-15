@@ -50,7 +50,7 @@ curl -H "Authorization: Bearer <AM_TOKEN>" http://192.168.1.150:8090/healthz
 ```
 
 说明:
-- 容器内 `AM_BIND=0.0.0.0`(LAN 暴露由 `ports: "8090:8090"` 端口映射实现;非回环绑定 + token 满足 SPEC §8 绑定门禁)。若要更严,可去掉 ports 改走 SSH 隧道。
+- 容器内 `AM_BIND=0.0.0.0`(LAN 暴露由 `ports: "192.168.1.150:8090:8090"` 端口映射实现,只发布在 LAN 网卡;非回环绑定 + token 满足 SPEC §8 绑定门禁)。若要更严,可去掉 ports 改走 SSH 隧道。
 - `deploy/.env` 不同步、不提交(gitignore);NAS 上单独保管,泄漏即重新生成 token。
 
 ## 3. 升级
