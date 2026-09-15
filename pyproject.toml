@@ -8,7 +8,8 @@ readme = "README.md"
 [tool.ruff]
 line-length = 110
 target-version = "py311"
-extend-exclude = ["vendor", ".local", "data"]
+# docs/:Markdown 中的 Python 代码样例是文档内容,格式化会产生无意义 diff
+extend-exclude = ["vendor", ".local", "data", "docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]
@@ -17,6 +18,9 @@ ignore = ["S101", "S603", "S607"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
 "sim/**" = ["S"]
+# SQL 字符串只插值模块级常量列清单(_COLS/_RUN_COLS/内部表名字典),动态值一律走 ? 占位
+"app/services/**" = ["S608"]
+"app/db.py" = ["S608"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
