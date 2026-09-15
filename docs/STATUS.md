@@ -10,8 +10,8 @@
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
 | S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
 | S6 | feat/web-ui | done | 67301e9 | 4a3f932 (merge) | 2026-09-15 用户确认 |
-| S7 | feat/deploy | awaiting_confirmation | 9701e76 | | 本地 root 跑法仅限 Docker Desktop |
-| S8 | feat/acceptance | todo | | | |
+| S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
+| S8 | feat/acceptance | in_progress | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
