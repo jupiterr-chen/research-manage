@@ -1,0 +1,56 @@
+<div id="run-region"
+     {% if not run.terminal %}hx-get="/fragments/runs/{{ run.id }}" hx-trigger="every 15s"{% endif %}
+     hx-swap="outerHTML">
+
+  {% if flash_ok %}<p class="flash-ok">{{ flash_ok }}</p>{% endif %}
+  {% if flash_error %}<p class="flash-error">{{ flash_error }}</p>{% endif %}
+
+  <section class="card">
+    <div class="task-grid">
+      <div>
+        <span class="dot dot-{{ run.status }}"></span>
+        <strong>{{ { "queued": "排队中", "running": "运行中", "succeeded": "成功", "failed": "失败", "cancelled": "已取消" }[run.status] }}</strong>
+        <span class="muted">触发:{{ run.trigger }}{% if run.resumed_from %} · 续自 {{ run.resumed_from }}{% endif %}</span>
+        {% if run.status_stale %}<span class="badge stale">状态延迟</span>{% endif %}
+      </div>
+      <div class="muted">分析师进度 {{ run.agents_done }}/{{ run.agents_total }} · 当前 {{ run.current_agent or "—" }}</div>
+      <div class="progress"><span style="width: {{ (run.agents_done * 100 / run.agents_total) | round | int }}%"></span></div>
+      <div class="muted mono">tokens 入 {{ run.tokens_in }} / 出 {{ run.tokens_out }} · 耗时 {{ run.elapsed }} · 退出码 {{ run.exit_code if run.exit_code is not none else "—" }}</div>
+      <div>
+        报告:{% if run.report_ready %}<span class="ok-text">已生成 ✓</span>{% else %}<span class="muted">未生成 ✗</span>{% endif %}
+      </div>
+      <div class="actions">
+        {% if run.can_cancel %}
+        <button hx-post="/fragments/runs/{{ run.id }}/cancel" hx-target="#run-region" hx-swap="outerHTML"
+                hx-confirm="确认取消 {{ run.id }}?运行中的任务会在保存断点后停止,可稍后续跑。">取消任务</button>
+        {% endif %}
+        {% if run.can_resume %}
+        <button hx-post="/fragments/runs/{{ run.id }}/resume" hx-target="#run-region" hx-swap="outerHTML">断点续跑</button>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Agent 时间线</h2>
+    <ol class="timeline">
+      {% for agent in run.timeline %}
+      {% set done = loop.index0 < run.agents_done or (run.terminal and run.status == "succeeded") %}
+      {% set active = (not run.terminal) and agent == run.current_agent %}
+      <li class="{% if done %}done{% elif active %}active{% else %}pending{% endif %}">
+        <span class="tl-marker"></span>{{ agent }}
+        {% if active %}<span class="badge">进行中</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>产物与日志</h2>
+    <p>container.log 路径:<span class="mono">{{ run.container_log }}</span><span class="muted">(仅路径,内容请经 SMB 查看)</span></p>
+    {% if run.error %}
+    <div class="flash-error"><p><strong>错误:</strong>{{ run.error }}</p></div>
+    {% endif %}
+    <p class="muted">报告文件经 <a href="/api/v1/runs/{{ run.id }}/artifacts">artifacts API</a> 查询路径;原文件经 SMB 打开。</p>
+  </section>
+</div>

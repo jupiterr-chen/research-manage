@@ -1,0 +1,91 @@
+<div id="overview-region"
+     {% if oob %}hx-swap-oob="true"{% endif %}
+     hx-get="/fragments/overview" hx-trigger="every 15s" hx-swap="outerHTML">
+
+  <section class="card" id="current-task">
+    <h2>当前任务</h2>
+    {% if current %}
+    <div class="task-grid">
+      <div><strong>{{ current.code }}</strong> <span class="muted">{{ current.date }} · 分析师 {{ current.agents_done }}/{{ current.agents_total }}</span>
+        {% if current.status_stale %}<span class="badge stale">状态延迟</span>{% endif %}
+      </div>
+      <div class="muted">当前 agent:{{ current.current_agent or "—" }}</div>
+      <div class="progress" title="agents {{ current.agents_done }}/{{ current.agents_total }}">
+        <span style="width: {{ (current.agents_done * 100 / current.agents_total) | round | int }}%"></span>
+      </div>
+      <div class="muted mono">tokens 入 {{ current.tokens_in }} / 出 {{ current.tokens_out }} · 已耗时 {{ current.elapsed }}</div>
+      <div>
+        <button hx-post="/fragments/runs/{{ current.id }}/cancel"
+                hx-target="#run-region" hx-swap="none"
+                hx-confirm="确认取消当前任务 {{ current.id }}?运行中的任务会在保存断点后停止。">
+          取消
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">空闲:没有正在执行的任务。</p>
+    {% endif %}
+  </section>
+
+  <section class="card" id="queue">
+    <h2>队列({{ queued | length }})</h2>
+    {% if queued %}
+    <table>
+      <thead><tr><th>run</th><th>标的</th><th>日期</th><th>分析师</th><th>触发</th><th></th></tr></thead>
+      <tbody>
+        {% for q in queued %}
+        <tr>
+          <td class="mono">{{ q.id }}</td>
+          <td>{{ q.code }}</td>
+          <td>{{ q.date }}</td>
+          <td>{{ q.analysts_list | length }}</td>
+          <td>{{ q.trigger }}</td>
+          <td><button hx-post="/fragments/runs/{{ q.id }}/cancel" hx-target="#run-region" hx-swap="none"
+                      hx-confirm="确认取消排队任务 {{ q.id }}?">取消</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">队列为空。</p>
+    {% endif %}
+  </section>
+
+  <section class="card" id="today-fires">
+    <h2>今日调度预告({{ today }} · {{ pre_market_hint }})</h2>
+    {% if next_fires %}
+    <ul class="fires">
+      {% for f in next_fires %}
+      <li><span class="mono">{{ f.at }}</span> {{ f.code }}({{ f.analysts }})</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">今日无剩余调度触发。</p>
+    {% endif %}
+  </section>
+
+  <section class="card" id="recent-runs">
+    <h2>最近 {{ recent | length }} 条运行</h2>
+    {% if recent %}
+    <table>
+      <thead><tr><th></th><th>run</th><th>标的</th><th>日期</th><th>状态</th><th>报告</th><th>耗时</th><th></th></tr></thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td><span class="dot dot-{{ r.status }}" title="{{ r.status }}"></span></td>
+          <td class="mono">{{ r.id }}</td>
+          <td>{{ r.code }}</td>
+          <td>{{ r.date }}</td>
+          <td>{{ { "queued": "排队", "running": "运行中", "succeeded": "成功", "failed": "失败", "cancelled": "已取消" }[r.status] }}</td>
+          <td>{% if r.report_ready %}<span class="ok-text">✓</span>{% else %}<span class="muted">✗</span>{% endif %}</td>
+          <td class="muted">{{ r.elapsed }}</td>
+          <td><a href="/runs/{{ r.id }}">详情</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">暂无运行记录。</p>
+    {% endif %}
+  </section>
+</div>

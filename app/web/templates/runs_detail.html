@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}运行 {{ run.id }}{% endblock %}
+{% block content %}
+<h2 class="run-title mono">{{ run.id }}
+  <span class="muted">{{ run.code }} @ {{ run.date }}</span>
+</h2>
+{% include "fragments/run_detail.html" %}
+{% endblock %}

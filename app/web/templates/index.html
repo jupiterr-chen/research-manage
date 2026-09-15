@@ -1,10 +1,50 @@
 {% extends "base.html" %}
 {% block title %}总览{% endblock %}
 {% block content %}
-{% if placeholder %}
-<section class="card placeholder">
-  <h2>总览</h2>
-  <p class="muted">P0 阶段骨架页:手动发起、当前任务、队列与调度预告由 feat/web-ui(S6)交付。</p>
+
+<section class="card" id="manual-run-card">
+  <h2>手动发起</h2>
+  <form hx-post="/fragments/run" hx-target="#run-result" hx-swap="outerHTML" class="run-form">
+    <div class="form-row">
+      <label>标的
+        <select name="code" required>
+          <option value="">— 选择标的 —</option>
+          {% for inst in instruments %}
+          <option value="{{ inst.code }}">{{ inst.code }}{% if inst.name %} · {{ inst.name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>分析日期(默认今天)
+        <input type="date" name="date" value="{{ today }}">
+      </label>
+    </div>
+    <div class="form-row" id="analyst-mode">
+      <label class="inline"><input type="radio" name="mode" value="profile" checked> 用档案</label>
+      <label>档案
+        <select name="profile_id">
+          {% for p in profiles %}
+          <option value="{{ p.id }}">{{ p.name }}({{ p.analysts_csv }})</option>
+          {% endfor %}
+        </select>
+      </label>
+      <span class="muted">或</span>
+      <label class="inline"><input type="radio" name="mode" value="analysts"> 临时勾选分析师</label>
+      <span class="analyst-box">
+        {% for a in analysts_options %}
+        <label class="inline"><input type="checkbox" name="analysts" value="{{ a }}"> {{ analyst_label[a] }}</label>
+        {% endfor %}
+      </span>
+    </div>
+    <div class="form-row">
+      <label class="inline"><input type="checkbox" name="force" value="1"> 强制重跑(该日期已成功时需要)</label>
+      <button type="submit">发起研究</button>
+    </div>
+  </form>
+  <div id="run-result">
+    <p class="muted">提示:存在运行中或排队任务时,手动发起会被拒绝(内联提示,不跳转)。</p>
+  </div>
 </section>
-{% endif %}
+
+{% include "fragments/overview.html" %}
+
 {% endblock %}

@@ -1,0 +1,136 @@
+<div id="instruments-block" class="instruments-block">
+
+  {% if message %}<p class="flash-ok">{{ message }}</p>{% endif %}
+  {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
+
+  <section class="card">
+    <h2>新增标的</h2>
+    <form hx-post="/fragments/instruments" hx-target="#instruments-block" hx-swap="outerHTML" class="form-row">
+      <label>市场
+        <select name="market">
+          {% for m in markets %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>代码 <input name="code" placeholder="1810.HK / NVDA / 600519.SS" required></label>
+      <label>名称 <input name="name" placeholder="小米集团"></label>
+      <button type="submit">添加</button>
+    </form>
+  </section>
+
+  {% for inst in instruments %}
+  <section class="card instrument-card" id="inst-{{ inst.id }}">
+    <div class="inst-head">
+      <h3>
+        <span class="dot {% if inst.enabled %}dot-succeeded{% else %}dot-muted{% endif %}"></span>
+        {{ inst.code }}{% if inst.name %} · {{ inst.name }}{% endif %}
+        <span class="muted">({{ inst.market }})</span>
+      </h3>
+      <div class="inst-actions">
+        <form hx-post="/fragments/instruments/{{ inst.id }}" hx-target="#instruments-block" hx-swap="outerHTML" class="inline">
+          <input type="hidden" name="name" value="{{ inst.name }}">
+          <input type="hidden" name="enabled" value="{% if inst.enabled %}0{% else %}1{% endif %}">
+          <button type="submit">{% if inst.enabled %}停用{% else %}启用{% endif %}</button>
+        </form>
+        <form hx-post="/fragments/instruments/{{ inst.id }}" hx-target="#instruments-block" hx-swap="outerHTML" class="inline rename">
+          <input name="name" value="{{ inst.name }}" placeholder="改名称">
+          <input type="hidden" name="enabled" value="{% if inst.enabled %}1{% else %}0{% endif %}">
+          <button type="submit">改名</button>
+        </form>
+        <button hx-delete="/fragments/instruments/{{ inst.id }}" hx-target="#instruments-block" hx-swap="outerHTML"
+                hx-confirm="确认删除标的 {{ inst.code }}?若有关联调度将拒绝并提示。">删除</button>
+      </div>
+    </div>
+
+    <div class="profiles-line muted">
+      档案:
+      {% for p in profiles %}<span class="chip">{{ p.name }}({{ p.analysts_csv }})</span>{% endfor %}
+    </div>
+
+    {% if monday_hint.get(inst.id) %}
+    <p class="hint">周一将只跑全量(日频与周频同时命中时,按超集去重)</p>
+    {% endif %}
+
+    <table class="sched-table">
+      <thead><tr><th>调度</th><th>复述</th><th>操作</th></tr></thead>
+      <tbody>
+        {% for s in schedules_by_inst.get(inst.id, []) %}
+        <tr>
+          <td class="mono">#{{ s.id }} {% if not s.enabled %}<span class="muted">(已停用)</span>{% endif %}</td>
+          <td>{{ describe_by_sched.get(s.id, "") }}</td>
+          <td class="sched-ops">
+            <form hx-post="/fragments/schedules/{{ s.id }}/toggle" hx-target="#instruments-block" hx-swap="outerHTML" class="inline">
+              <button type="submit">{% if s.enabled %}停用{% else %}启用{% endif %}</button>
+            </form>
+            <button hx-delete="/fragments/schedules/{{ s.id }}" hx-target="#instruments-block" hx-swap="outerHTML"
+                    hx-confirm="确认删除调度 #{{ s.id }}?">删除</button>
+            <details class="edit-details">
+              <summary>编辑</summary>
+              <form hx-post="/fragments/schedules/{{ s.id }}" hx-target="#instruments-block" hx-swap="outerHTML" class="form-row">
+                <label>类型
+                  <select name="kind">
+                    <option value="daily_trading" {% if s.kind == "daily_trading" %}selected{% endif %}>每交易日</option>
+                    <option value="weekly" {% if s.kind == "weekly" %}selected{% endif %}>每周</option>
+                  </select>
+                </label>
+                <label>时间 <input name="at_time" value="{{ s.at_time }}" placeholder="08:30"></label>
+                <label>周几(周频)
+                  <select name="weekday">
+                    <option value="">—</option>
+                    {% for w, label in weekday_label.items() %}
+                    <option value="{{ w }}" {% if s.weekday == w %}selected{% endif %}>周{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>档案
+                  <select name="profile_id">
+                    {% for p in profiles %}
+                    <option value="{{ p.id }}" {% if s.profile_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <button type="submit">保存</button>
+              </form>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr class="add-sched-row">
+          <td colspan="3">
+            <details>
+              <summary>+ 添加调度</summary>
+              <form hx-post="/fragments/schedules" hx-target="#instruments-block" hx-swap="outerHTML" class="form-row">
+                <input type="hidden" name="instrument_id" value="{{ inst.id }}">
+                <label>类型
+                  <select name="kind">
+                    <option value="daily_trading">每交易日</option>
+                    <option value="weekly">每周</option>
+                  </select>
+                </label>
+                <label>时间 <input name="at_time" value="08:30"></label>
+                <label>周几(周频)
+                  <select name="weekday">
+                    <option value="">—</option>
+                    {% for w, label in weekday_label.items() %}
+                    <option value="{{ w }}">周{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>档案
+                  <select name="profile_id">
+                    {% for p in profiles %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <button type="submit">添加</button>
+              </form>
+            </details>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  {% else %}
+  <section class="card"><p class="muted">还没有标的:先在上方添加(如 hk 1810.HK)。</p></section>
+  {% endfor %}
+</div>
