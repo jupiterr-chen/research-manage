@@ -12,9 +12,16 @@
 | S6 | feat/web-ui | done | 67301e9 | 4a3f932 (merge) | 2026-09-15 用户确认 |
 | S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
 | S8 | feat/acceptance | done | a66f444 | 86ec931 (merge) | 2026-09-15 用户确认;AM-05 审计留痕偏差经用户决定忽略 |
-| S9 | 移交(tag v1.0.0-rc1) | in_progress | | | |
+| S9 | 移交(tag v1.0.0-rc1) | done | 49e160d | tag v1.0.0-rc1 | 2026-09-15 开发阶段完成,移交 P3 |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S9 移交 — done(2026-09-15)
+
+- develop @ 49e160d 打 tag **v1.0.0-rc1** 并 push;S1~S9 全部 done。
+- 开发阶段完成:P3(NAS 验收与生产部署)移交最终验收方,
+  入口 docs/ACCEPTANCE.md §2 与 docs/ROADMAP.md §3 P3。
+- 遗留(用户已决定忽略):worker 内部转移(看门狗/host_restarted)无审计留痕(SPEC actor 枚举限制)。
 
 ### S8 feat/acceptance — awaiting_confirmation(2026-09-15)
 
