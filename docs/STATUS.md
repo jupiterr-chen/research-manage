@@ -8,8 +8,8 @@
 | S2 | feat/runner | done | e89328f | 737d856 (merge) | 2026-09-15 用户确认;[interface] 常量修正获认可 |
 | S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
-| S5 | feat/api-runs | awaiting_confirmation | 98604a5 | | models 增补 code_market() 辅助 |
-| S6 | feat/web-ui | todo | | | |
+| S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
+| S6 | feat/web-ui | in_progress | | | |
 | S7 | feat/deploy | todo | | | |
 | S8 | feat/acceptance | todo | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
