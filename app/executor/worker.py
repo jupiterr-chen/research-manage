@@ -142,8 +142,10 @@ class Worker(threading.Thread):
             run = services.runs.pick_next_queued(conn)
             if run is None:
                 return
-            run_dir = Path(self.settings.data_host) / "runs" / run["id"]
-            run_dir.mkdir(parents=True, exist_ok=True)
+            # 工作区:在容器内按 AM_DATA_DIR 创建;传给 docker 的是同一目录的宿主路径 AM_DATA_HOST
+            # (约束 10;生产两者不同,本地开发相同——T-06)
+            (Path(self.settings.data_dir) / "runs" / run["id"]).mkdir(parents=True, exist_ok=True)
+            workspace_host = str(Path(self.settings.data_host) / "runs" / run["id"])
             spec = ContainerSpec(
                 image=self.settings.ta_image,
                 run_id=run["id"],
@@ -153,7 +155,7 @@ class Worker(threading.Thread):
                 ta_data_host=self.settings.ta_data_host,
                 ta_env_host=self.settings.ta_env_host,
                 runner_host=self.settings.runner_host,
-                workspace_host=str(run_dir),
+                workspace_host=workspace_host,
                 ta_container_data=self.settings.ta_container_data,
                 workdir=self.settings.ta_workdir,
                 stop_timeout=self.settings.stop_timeout,

@@ -13,8 +13,10 @@
 
 | T-04 | S3 | fixed(见下) | P3 部署 | compose 未设 `name:`,项目名取自目录 → 镜像/容器名为 `deploy-agents-manage*`,与 DEPLOY.md §5 的 `docker ps -qf name=agents-manage` 仍可匹配但易混淆 | compose 顶层 `name: agents-manage` | `deploy/docker-compose.yml` |
 | T-05 | S1 | fixed(部署脚本/文档;代码部分 open) | P3 首次部署 | NAS 首次 `up -d` 失败:`data/` 不存在时 docker 以 root 创建 bind 源目录,管理台(uid 1000)`unable to open database file`,容器反复重启 | ① `sync_to_nas.sh` 预建 `data/runs`(已修);DEPLOY §2/§7 补说明(已修);② **代码**:lifespan 应在连接 SQLite 前检查 `AM_DATA_DIR` 可写并给出中文原因后退出码 2(R-EXE-03 已要求,但 DB 连接发生在自检之前) | `scripts/sync_to_nas.sh`、`docs/DEPLOY.md`、`app/web/server.py::lifespan` |
+| T-06 | S1 | fixed(fix/T-06-workspace-host-path) | P3 第 4 步首次发起 | run 停在 queued:Worker 用 `AM_DATA_HOST`(宿主路径)在**容器内** mkdir 工作区 → `PermissionError: /home/chen`,每 tick 重抛。本地开发 HOST=DIR 故未被任何测试覆盖 | 工作区在 `AM_DATA_DIR/runs/<id>` 创建,`spec.workspace_host` 用 `AM_DATA_HOST` 拼接;新增单测强制 HOST≠DIR | `app/executor/worker.py::_launch_next` |
 
 ## 记录
 
 - 2026-09-15 T-02、T-04:由验收方在 `release/v1.0` 直接修正(单行 compose 改动,不经开发 agent)。
 - 2026-09-15 T-05:现场处置 `down → rmdir data → mkdir -p data/runs → up`,管理台 healthy;脚本/文档已修,代码部分留给开发 agent。
+- 2026-09-15 T-06:由验收方修复(3 行 + 回归测试),理由:阻塞真实运行且改动边界清晰;`tests/conftest.py::make_settings` 默认 HOST=DIR 是测试盲区,建议开发 agent 在 T-05 代码项一并把 conftest 默认改为 HOST≠DIR。
