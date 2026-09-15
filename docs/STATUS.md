@@ -4,7 +4,7 @@
 
 | 步 | 分支 | 状态 | 分支最新 commit | 合入 develop 的 sha | 备注 |
 |---|---|---|---|---|---|
-| S1 | feat/p0-foundation | awaiting_confirmation | (见下) | | 待用户确认后合并 |
+| S1 | feat/p0-foundation | awaiting_confirmation | 836a3cc | | 待用户确认后合并 |
 | S2 | feat/runner | todo | | | |
 | S3 | feat/executor | todo | | | |
 | S4 | feat/scheduler | todo | | | |
