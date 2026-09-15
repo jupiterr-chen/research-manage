@@ -5,7 +5,7 @@
 | 步 | 分支 | 状态 | 分支最新 commit | 合入 develop 的 sha | 备注 |
 |---|---|---|---|---|---|
 | S1 | feat/p0-foundation | done | 1d1ebf2 | b57c45c (merge) | 2026-09-15 用户确认;4 项假设与 ruff 豁免均获认可 |
-| S2 | feat/runner | awaiting_confirmation | (本次提交) | | [interface] models/DESIGN 常量对齐真实源码 |
+| S2 | feat/runner | awaiting_confirmation | 582da69 | | [interface] models/DESIGN 常量对齐真实源码 |
 | S3 | feat/executor | todo | | | |
 | S4 | feat/scheduler | todo | | | |
 | S5 | feat/api-runs | todo | | | |
