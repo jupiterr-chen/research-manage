@@ -5,7 +5,7 @@
 | 步 | 分支 | 状态 | 分支最新 commit | 合入 develop 的 sha | 备注 |
 |---|---|---|---|---|---|
 | S1 | feat/p0-foundation | done | 1d1ebf2 | b57c45c (merge) | 2026-09-15 用户确认;4 项假设与 ruff 豁免均获认可 |
-| S2 | feat/runner | in_progress | | | |
+| S2 | feat/runner | awaiting_confirmation | 582da69 | | [interface] models/DESIGN 常量对齐真实源码 |
 | S3 | feat/executor | todo | | | |
 | S4 | feat/scheduler | todo | | | |
 | S5 | feat/api-runs | todo | | | |
@@ -15,6 +15,13 @@
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S2 feat/runner — awaiting_confirmation(2026-09-15)
+
+- 交付:runner/runner.py(SPEC §6.1 八步,合并 CLI 流式与 propagate 收尾)、sim/ 假包(8 种 SIM_MODE + 断点模拟)+ build_sim.sh、fetch/verify_vendor.sh(vendor/ 与 NAS 镜像 80 文件哈希一致)、tests/shape(AST 签名对等 13 项)、sim/llm_stub + build_local.sh(tradingagents-local 不改源码构建)+ compose.local llm-stub 服务、单测/集成/real 三层测试。
+- [interface]:ANALYST_AGENT["social"] Social→Sentiment Analyst;FIXED_AGENTS 顺序 Neutral/Conservative 对调——按 NAS 真实 cli/main.py 修正,DESIGN §4.1 已同步。
+- 测试:unit 249 + shape 13 + docker 11 + real 3 全绿;vendor 镜像一致性校验通过。
+- 关键结论:真实图在 llm-stub 下能完整走完(3/4 分析师均 succeeded、三产物齐全、取消后 resume 续跑);未对数据工具打 monkeypatch(yfinance 经代理真实调用,失败按上游 fail-open)。
 
 ### S1 feat/p0-foundation — awaiting_confirmation(2026-09-15)
 

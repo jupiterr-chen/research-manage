@@ -121,8 +121,8 @@ uvicorn 主进程(单 worker)
 MARKETS = ("us", "hk", "cn")
 ANALYSTS = ("market", "social", "news", "fundamentals")
 FIXED_AGENTS = ("Bull Researcher", "Bear Researcher", "Research Manager", "Trader",
-                "Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager")
-ANALYST_AGENT = {"market": "Market Analyst", "social": "Social Analyst",
+                "Aggressive Analyst", "Neutral Analyst", "Conservative Analyst", "Portfolio Manager")
+ANALYST_AGENT = {"market": "Market Analyst", "social": "Sentiment Analyst",
                  "news": "News Analyst", "fundamentals": "Fundamentals Analyst"}
 RUN_STATUS = ("queued", "running", "succeeded", "failed", "cancelled")
 TRIGGERS = ("web", "api", "schedule")

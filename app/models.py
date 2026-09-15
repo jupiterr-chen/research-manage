@@ -15,19 +15,22 @@ SH_TZ = ZoneInfo("Asia/Shanghai")
 
 MARKETS = ("us", "hk", "cn")
 ANALYSTS = ("market", "social", "news", "fundamentals")
+# 顺序照抄上游 cli/main.py 的 FIXED_AGENTS 展平(Risk Management 内部顺序:Aggressive→Neutral→Conservative)
 FIXED_AGENTS = (
     "Bull Researcher",
     "Bear Researcher",
     "Research Manager",
     "Trader",
     "Aggressive Analyst",
-    "Conservative Analyst",
     "Neutral Analyst",
+    "Conservative Analyst",
     "Portfolio Manager",
 )
+# [interface] 2026-09-15:S2 依据 NAS 真实源码(cli/main.py ANALYST_MAPPING)修正
+# social → "Sentiment Analyst"(DESIGN 原文误写为 "Social Analyst");与 tests/shape 对等测试联动
 ANALYST_AGENT = {
     "market": "Market Analyst",
-    "social": "Social Analyst",
+    "social": "Sentiment Analyst",
     "news": "News Analyst",
     "fundamentals": "Fundamentals Analyst",
 }
