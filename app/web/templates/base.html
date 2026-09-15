@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Agents-Manage{% endblock %} · 研究任务管理台</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <nav class="nav">
+    <a class="brand" href="/">Agents-Manage</a>
+    <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>总览</a>
+    <a href="/instruments" {% if request.url.path.startswith('/instruments') %}class="active"{% endif %}>标的与调度</a>
+    <span class="spacer"></span>
+    <span class="lights" title="工作循环 / 队列深度 / docker 可达">
+      <span class="light {% if health and health.alive %}ok{% else %}bad{% endif %}" id="light-worker">worker</span>
+      <span class="light {% if health and health.queue_depth == 0 %}ok{% else %}warn{% endif %}" id="light-queue">队列 {{ health.queue_depth|default(0) }}</span>
+      <span class="light {% if health and health.docker_ok %}ok{% else %}warn{% endif %}" id="light-docker">docker</span>
+    </span>
+    <form method="post" action="/logout" class="inline">
+      <button type="submit" class="linklike">登出</button>
+    </form>
+  </nav>
+</header>
+<main class="content">
+  {% block content %}{% endblock %}
+</main>
+<footer class="footer">Agents-Manage · TradingAgents 研究任务管理台 · 仅供研究参考</footer>
+</body>
+</html>

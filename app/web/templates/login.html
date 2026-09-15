@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · Agents-Manage</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="login-bg">
+<main class="login-card">
+  <h1>Agents-Manage</h1>
+  <p class="muted">TradingAgents 研究任务管理台</p>
+  {% if local_mode %}
+    <p class="flash-info">当前为本地模式(未配置 AM_TOKEN,仅回环绑定可用),可直接<a href="/">进入</a>。</p>
+  {% endif %}
+  {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="token">访问 Token</label>
+    <input type="password" id="token" name="token" autocomplete="off" autofocus required>
+    <button type="submit">登录</button>
+  </form>
+</main>
+</body>
+</html>

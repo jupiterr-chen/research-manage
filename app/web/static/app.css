@@ -1,0 +1,154 @@
+/* Agents-Manage 手写 CSS(R-WEB-01:无构建、无外链) */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --ink: #1f2430;
+  --muted: #6b7280;
+  --line: #e2e5ea;
+  --accent: #2563eb;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --mono: ui-monospace, Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.topbar {
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 0 20px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 1080px;
+  margin: 0 auto;
+  height: 48px;
+}
+
+.nav .brand { font-weight: 700; color: var(--ink); }
+.nav a.active { color: var(--accent); font-weight: 600; }
+.nav .spacer { flex: 1; }
+.nav .inline { display: inline; }
+
+.linklike {
+  border: 0; background: none; color: var(--accent);
+  font: inherit; cursor: pointer; padding: 0;
+}
+.linklike:hover { text-decoration: underline; }
+
+.lights { display: inline-flex; gap: 8px; align-items: center; }
+
+.light {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--panel);
+}
+.light.ok   { color: var(--ok);   border-color: var(--ok); }
+.light.warn { color: var(--warn); border-color: var(--warn); }
+.light.bad  { color: var(--bad);  border-color: var(--bad); }
+
+.content {
+  max-width: 1080px;
+  margin: 20px auto;
+  padding: 0 20px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.card h2 { margin: 0 0 10px; font-size: 16px; }
+
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+
+.flash-error {
+  background: #fef2f2;
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.flash-info {
+  background: #eff6ff;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; }
+
+.progress {
+  height: 8px; border-radius: 4px; background: var(--line); overflow: hidden;
+}
+.progress > span { display: block; height: 100%; background: var(--accent); }
+
+.footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 16px 0 24px;
+  font-size: 12px;
+}
+
+/* 登录页 */
+.login-bg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 28px 32px;
+  width: 340px;
+}
+
+.login-card h1 { margin: 0 0 4px; font-size: 20px; }
+.login-card label { display: block; margin: 12px 0 4px; color: var(--muted); }
+.login-card input[type="password"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+}
+.login-card button {
+  margin-top: 16px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
