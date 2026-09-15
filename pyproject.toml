@@ -15,6 +15,10 @@ extend-exclude = ["vendor", ".local", "data", "docs"]
 select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["S101", "S603", "S607"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 依赖注入的惯用法:Depends(...) 作为参数默认值
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.Query"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
 "sim/**" = ["S"]

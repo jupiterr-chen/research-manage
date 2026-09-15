@@ -95,6 +95,17 @@ def validate_code(market: str, code: str) -> None:
         raise ValueError(_MARKET_MSG[market])
 
 
+def code_market(code: str) -> str | None:
+    """代码符合哪个市场的格式(不做存在性检查);都不符 → None。
+
+    API 层用它区分 400(格式非法)与 404(标的未添加)。
+    """
+    for market in MARKETS:
+        if _CODE_RE[market].match(code.strip().upper()):
+            return market
+    return None
+
+
 def parse_analysts(csv: str) -> tuple[str, ...]:
     """去重、按 ANALYSTS 顺序;非法或空 raise ValueError。"""
     items = [x.strip() for x in csv.split(",") if x.strip()]
