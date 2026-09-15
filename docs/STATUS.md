@@ -10,11 +10,23 @@
 | S4 | feat/scheduler | done | a04ea23 | 17e8a83 (merge) | 2026-09-15 用户确认 |
 | S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
 | S6 | feat/web-ui | done | 67301e9 | 4a3f932 (merge) | 2026-09-15 用户确认 |
-| S7 | feat/deploy | in_progress | | | |
+| S7 | feat/deploy | awaiting_confirmation | (本次提交) | | 本地 root 跑法仅限 Docker Desktop |
 | S8 | feat/acceptance | todo | | | |
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S7 feat/deploy — awaiting_confirmation(2026-09-15)
+
+- 交付:deploy/Dockerfile(python:3.12-slim、build-arg APP_UID/DOCKER_GID、非 root、无 node,
+  pip --trusted-host 规避代理 MITM)、docker-compose.yml(SPEC §9+healthcheck)、
+  docker-compose.local.yml(管理台+llm-stub)、.env.example、scripts/sync_to_nas.sh(排除
+  data/vendor/.local/.git/.venv/.env)、scripts/gen_token.py、docs/DEPLOY.md 全 7 章
+  (含 NAS 只读实测数值 1000:1000 / 994 / c85a52e…)。
+- 验证:本地 compose.local up → /healthz docker_ok=true → API 发起 sim 任务 → succeeded、
+  双重判定通过、artifacts 6 路径、container.log 落档;镜像内 which node 为空。
+- 假设:容器内 AM_BIND=0.0.0.0(LAN 暴露由端口映射实现,SPEC §8 门禁仍生效);
+  Docker Desktop 的 sock 为 root:root,本地 compose 以 root 跑(生产 1000:994)。
 
 ### S6 feat/web-ui — awaiting_confirmation(2026-09-15)
 
