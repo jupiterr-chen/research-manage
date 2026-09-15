@@ -1,0 +1,14 @@
+# 本地全链路 compose(feat/runner 先交付 llm-stub;管理台服务由 feat/deploy S7 补齐)。
+# 网络名固定 research-manage_default(DESIGN §8:AM_TA_NETWORK=research-manage_default),
+# 执行容器加入该网络后可解析 llm-stub。
+name: research-manage
+
+services:
+  llm-stub:
+    build: ../sim/llm_stub
+    image: llm-stub:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      STUB_DELAY_SECONDS: "0"
