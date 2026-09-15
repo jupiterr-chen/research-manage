@@ -11,8 +11,8 @@
 | S5 | feat/api-runs | done | ecbb630 | 253216a (merge) | 2026-09-15 用户确认 |
 | S6 | feat/web-ui | done | 67301e9 | 4a3f932 (merge) | 2026-09-15 用户确认 |
 | S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
-| S8 | feat/acceptance | awaiting_confirmation | 0c66985 | | AM-05 审计留痕偏差待用户拍板 |
-| S9 | 移交(tag v1.0.0-rc1) | todo | | | |
+| S8 | feat/acceptance | done | a66f444 | 86ec931 (merge) | 2026-09-15 用户确认;AM-05 审计留痕偏差经用户决定忽略 |
+| S9 | 移交(tag v1.0.0-rc1) | in_progress | | | |
 
 ## 汇报摘要(每步一条,最新在上)
 
