@@ -173,9 +173,18 @@ class TestWorkerHealth:
     def test_scheduler_stub(self, settings, conn):
         from datetime import date as d
 
+        # 真实 scheduler 会关闭自己经 db_factory 取得的连接 → 必须每次新连接
+        from pathlib import Path as _P
+
+        from app import db as app_db
+        from app.db import connect
         from app.scheduler import Scheduler
 
-        s = Scheduler(settings, db_factory=lambda: conn)
+        _P(settings.db_path).parent.mkdir(parents=True, exist_ok=True)
+        init = connect(settings.db_path)
+        app_db.migrate(init)
+        init.close()
+        s = Scheduler(settings, db_factory=lambda: connect(settings.db_path))
         assert s.rebuild_jobs() == 0
         assert s.next_fires(d(2026, 9, 14)) == []
         assert s.jobs_count == 0

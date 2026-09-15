@@ -7,7 +7,7 @@
 | S1 | feat/p0-foundation | done | 1d1ebf2 | b57c45c (merge) | 2026-09-15 用户确认;4 项假设与 ruff 豁免均获认可 |
 | S2 | feat/runner | done | e89328f | 737d856 (merge) | 2026-09-15 用户确认;[interface] 常量修正获认可 |
 | S3 | feat/executor | done | 05f91c1 | 9b7d48a (merge) | 2026-09-15 用户确认 |
-| S4 | feat/scheduler | in_progress | | | |
+| S4 | feat/scheduler | awaiting_confirmation | baf818d | | 保留策略 03:30 任务一并接线 |
 | S5 | feat/api-runs | todo | | | |
 | S6 | feat/web-ui | todo | | | |
 | S7 | feat/deploy | todo | | | |
@@ -15,6 +15,16 @@
 | S9 | 移交(tag v1.0.0-rc1) | todo | | | |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S4 feat/scheduler — awaiting_confirmation(2026-09-15)
+
+- 交付:app/scheduler.py 真实实现(BackgroundScheduler + MemoryJobStore + Asia/Shanghai;
+  单线程执行器 + id 升序注册保证同 tick 顺序;触发只调 enqueue_scheduled;
+  next_fires 今日预告);schedules 写操作经 on_change 钩子触发 rebuild_jobs(server lifespan 接线);
+  每日 03:30 保留策略任务(retention.purge,R-EXE-11 接线)。
+- 测试:unit 318 全绿(新增 scheduler 19 项:周末不触发/周一去重全量/同 tick id 顺序/
+  next_fires/trigger 字段/钩子/生命周期);ruff 零告警。
+- 假设:APScheduler 3.11 的 Job.next_run_time 未调度时不可读,job_next_fire 回退 trigger 求值。
 
 ### S3 feat/executor — awaiting_confirmation(2026-09-15)
 

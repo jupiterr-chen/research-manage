@@ -1,13 +1,15 @@
 """调度 CRUD 与自然语言复述(R-SVC-03)。
 
-注意(S4 将替换):写操作后需调用 `app.state.scheduler.rebuild_jobs()`;
-P0 阶段调度器为 stub,未接入,故此处不调用。
+写操作(create/update/delete/toggle)成功后调用模块级钩子 `on_change`
+(由 server 接线为 `scheduler.rebuild_jobs()`,DESIGN §4.9);
+未接线时(纯单测/脚本)为 None,静默跳过。
 """
 
 from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Callable
 
 from app import audit, db, models
 from app.services.errors import NotFound, ValidationError
@@ -18,6 +20,19 @@ WEEKDAY_LABEL = {1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六", 7: 
 _AT_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 _COLS = "id, instrument_id, profile_id, kind, at_time, weekday, enabled"
+
+# server 生命周期内注入:写操作后全量重建调度作业
+on_change: Callable[[], None] | None = None
+
+
+def _notify_change() -> None:
+    if on_change is not None:
+        try:
+            on_change()
+        except Exception:  # noqa: BLE001 - 重建失败不阻断业务写操作
+            import logging
+
+            logging.getLogger("am.schedules").exception("rebuild_jobs 钩子失败")
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
@@ -76,6 +91,7 @@ def create(
             },
         )
         row = conn.execute(f"SELECT {_COLS} FROM schedule WHERE id=?", (schedule_id,)).fetchone()
+    _notify_change()
     return _row_to_dict(row)
 
 
@@ -123,6 +139,7 @@ def update(
         conn.execute(f"UPDATE schedule SET {','.join(sets)} WHERE id=?", params)
         audit.audit(conn, actor, "update", "schedule", str(schedule_id), detail)
         row = conn.execute(f"SELECT {_COLS} FROM schedule WHERE id=?", (schedule_id,)).fetchone()
+    _notify_change()
     return _row_to_dict(row)
 
 
@@ -132,6 +149,7 @@ def delete(conn: sqlite3.Connection, schedule_id: int, *, actor: str) -> None:
             raise NotFound(f"调度 id={schedule_id} 不存在")
         conn.execute("DELETE FROM schedule WHERE id=?", (schedule_id,))
         audit.audit(conn, actor, "delete", "schedule", str(schedule_id), None)
+    _notify_change()
 
 
 def toggle(conn: sqlite3.Connection, schedule_id: int, *, actor: str) -> dict:
@@ -143,6 +161,7 @@ def toggle(conn: sqlite3.Connection, schedule_id: int, *, actor: str) -> dict:
         conn.execute("UPDATE schedule SET enabled=? WHERE id=?", (new_enabled, schedule_id))
         audit.audit(conn, actor, "toggle", "schedule", str(schedule_id), {"enabled": bool(new_enabled)})
         row = conn.execute(f"SELECT {_COLS} FROM schedule WHERE id=?", (schedule_id,)).fetchone()
+    _notify_change()
     return _row_to_dict(row)
 
 
