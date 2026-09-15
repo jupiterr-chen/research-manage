@@ -148,8 +148,14 @@ async def cancel_run(run_id: str, db=Depends(get_db)) -> JSONResponse:
     return JSONResponse(status_code=200, content=_run_payload(run))
 
 
+class ResumeRequest(BaseModel):
+    """AM-04⑤:resume 不接受任何改动(含 analysts);多余字段 → 400。"""
+
+    model_config = {"extra": "forbid"}
+
+
 @router.post("/runs/{run_id}/resume", dependencies=[Depends(auth.require_auth)])
-async def resume_run(run_id: str, db=Depends(get_db)) -> JSONResponse:
+async def resume_run(run_id: str, db=Depends(get_db), body: ResumeRequest | None = None) -> JSONResponse:
     try:
         run = runs_srv.resume(db, run_id, actor="api")
     except BusyError as exc:

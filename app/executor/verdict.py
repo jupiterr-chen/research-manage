@@ -69,5 +69,5 @@ def decide(
     if not has_plan:
         missing.append("investment_plan.md")
     if not has_memory:
-        missing.append("memory 条目")
+        missing.append("memory 条目(trading_memory.md)")
     return Verdict("failed", f"退出码 0 但产物缺失: 缺少 {' 与 '.join(missing)}", has_plan)
