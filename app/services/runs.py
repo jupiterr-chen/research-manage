@@ -279,6 +279,31 @@ def enqueue_scheduled(conn: sqlite3.Connection, *, schedule_id: int, date: str) 
             raise NotFound(f"调度 {schedule_id} 引用的档案不存在")
         analysts = models.parse_analysts(prof["analysts_csv"])
         inst = {"id": sched["instrument_id"], "code": sched["code"]}
+        # T-10:同 (标的, 日期) 当天已 succeeded → 调度不再重跑(重跑=无断点的完整重算,且会用子集
+        # 覆盖已完成的全量报告)。周一"周频全量在前、日频在后"的布局依赖此规则;失败的 run 不算。
+        done = conn.execute(
+            "SELECT id, analysts_csv FROM run"
+            " WHERE instrument_id=? AND analysis_date=? AND status='succeeded'"
+            " ORDER BY finished_at DESC LIMIT 1",
+            (sched["instrument_id"], analysis_date),
+        ).fetchone()
+        if done:
+            audit.audit(
+                conn,
+                "schedule",
+                "deduped",
+                "run",
+                done["id"],
+                {
+                    "schedule_id": schedule_id,
+                    "date": analysis_date,
+                    "reason": "already_succeeded",
+                    "existing_analysts": done["analysts_csv"],
+                    "new_analysts": list(analysts),
+                    "replaced": False,
+                },
+            )
+            return None
         active = conn.execute(
             "SELECT id, analysts_csv, status FROM run"
             " WHERE instrument_id=? AND analysis_date=? AND status IN ('queued','running')",

@@ -238,6 +238,23 @@ class TestEnqueueScheduled:
         kept = conn.execute("SELECT analysts_csv FROM run WHERE status='running'").fetchone()
         assert kept["analysts_csv"] == "market"
 
+    def test_dedup_skips_when_same_date_already_succeeded(self, conn, inst):
+        """T-10:周一周频全量(早)已 succeeded,日频三件套(晚)不得再入队(否则子集覆盖全量报告)。"""
+        daily, weekly = self._mk_schedules(conn, inst)
+        r = runs.enqueue_scheduled(conn, schedule_id=weekly["id"], date=TODAY)
+        runs.mark_running(conn, r["id"], "cid")
+        runs.finalize(conn, r["id"], status="succeeded", exit_code=0, error=None, report_ready=True)
+        assert runs.enqueue_scheduled(conn, schedule_id=daily["id"], date=TODAY) is None
+        assert conn.execute("SELECT COUNT(*) AS n FROM run").fetchone()["n"] == 1
+        row = conn.execute("SELECT detail_json FROM audit_log WHERE action='deduped'").fetchone()
+        assert "already_succeeded" in row["detail_json"]
+        # 反向:日频(子集)先成功,周频全量也不重跑——布局约定是周频在前;这里只保证不重复烧额度
+        # 失败的 run 不阻断:允许日频作为兜底
+        r3 = runs.enqueue_scheduled(conn, schedule_id=weekly["id"], date="2026-09-11")
+        runs.mark_running(conn, r3["id"], "cid3")
+        runs.finalize(conn, r3["id"], status="failed", exit_code=1, error="boom", report_ready=False)
+        assert runs.enqueue_scheduled(conn, schedule_id=daily["id"], date="2026-09-11") is not None
+
     def test_disabled_schedule_noop(self, conn, inst):
         sched, _ = self._mk_schedules(conn, inst)
         schedules.toggle(conn, sched["id"], actor="web")
