@@ -16,6 +16,8 @@
 | T-06 | S1 | fixed(fix/T-06-workspace-host-path) | P3 第 4 步首次发起 | run 停在 queued:Worker 用 `AM_DATA_HOST`(宿主路径)在**容器内** mkdir 工作区 → `PermissionError: /home/chen`,每 tick 重抛。本地开发 HOST=DIR 故未被任何测试覆盖 | 工作区在 `AM_DATA_DIR/runs/<id>` 创建,`spec.workspace_host` 用 `AM_DATA_HOST` 拼接;新增单测强制 HOST≠DIR | `app/executor/worker.py::_launch_next` |
 | T-07 | S1 | fixed(fix/T-07-scrub-url-secrets) | P3 第 4 步失败落档 | **密钥泄漏到 `container.log`**:上游 TradingAgents 把 FRED 请求 URL(含 `api_key=<真实值>`)打进 stderr,`scrub()` 只处理字典键名与 `sk-*`,URL 查询串/键值对/Bearer 形式未遮蔽 → 违反 SPEC 约束 7 / AM-07 | `scrub_text()` 新增 `key=value`、`key: value`、JSON `"key": "v"`、`Bearer xxx` 遮蔽;回归测试用真实日志行形态;NAS 上已存在的 container.log 现场重新脱敏 | `app/audit.py` |
 | T-08 | S3 | open | P3 第 4 步 | 成功终态时 `current_agent` 停留在 `Aggressive Analyst`(12/12 已完成),不是最后一个节点 `Portfolio Manager` 或空;推测 runner 的 risk 团队三节点合并计数时未更新 current_agent | 终态 `phase=succeeded` 时 `current_agent` 置 null 或最后完成的 agent;页面显示"已完成" | `runner/runner.py` 状态映射 |
+| T-09 | S3 | open | 用户提问 | 调度 `at_time` 输入框未标注时区(固定 Asia/Shanghai),添加美股时易误填美东时间 | 标签改为「时间(北京)」,`describe()` 文案加「北京时间」;DESIGN §3 已注明 | `app/web/templates/fragments/instruments_block.html`、`app/services/schedules.py::describe` |
+| T-10 | S2 | fixed(fix/T-10-schedule-skip-succeeded) | 用户 HK 调度布局复核 | 调度去重只看 queued/running:周一周频全量(06:00)已 succeeded 后,日频三件套(08:01)照常入队 → 同日第二次完整重算,子集报告覆盖全量报告、重复烧额度。AM-10 只测了同 tick 的情形 | `enqueue_scheduled` 对同 (标的,日期) 已 succeeded 的直接跳过并审计 `deduped(reason=already_succeeded)`;失败的不阻断(日频兜底);布局约定「周一周频在前、日频在后」写入 DEPLOY/页面提示 | `app/services/runs.py::enqueue_scheduled` |
 
 ## 记录
 
@@ -23,3 +25,4 @@
 - 2026-09-15 T-05:现场处置 `down → rmdir data → mkdir -p data/runs → up`,管理台 healthy;脚本/文档已修,代码部分留给开发 agent。
 - 2026-09-15 T-06:由验收方修复(3 行 + 回归测试),理由:阻塞真实运行且改动边界清晰;`tests/conftest.py::make_settings` 默认 HOST=DIR 是测试盲区,建议开发 agent 在 T-05 代码项一并把 conftest 默认改为 HOST≠DIR。
 - 2026-09-15 T-07:由验收方修复;AM-07 的本地验收(FAKEKEY 假值)之所以没抓到,是因为 sim 与 llm-stub 不会像真实上游那样把带 key 的 URL 打进日志——建议开发 agent 在 sim 的 `fail` 模式里加一行含 `api_key=` 的 stderr 输出,让 AM-07 本地用例覆盖该形态。
+- 2026-09-16 T-10:由验收方修复(用户调整 HK 调度为周频早于日频后暴露;09-21 周一前必须上线)。附带交付 `scripts/apply_schedules.py`(经 HTTP 接口批量建调度,幂等)与 `deploy/schedules/us-2026-09-16.json`。

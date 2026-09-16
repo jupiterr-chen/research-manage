@@ -1,0 +1,14 @@
+{
+  "_comment": "美股四只:周一周频全量 19:00 起每 30 分钟一只(美东 07:00,盘前);每交易日日频三件套 20:50 起每 10 分钟一只,全部落在 21:30(EDT 开盘)之前。时间为 Asia/Shanghai。",
+  "schedules": [
+    {"code": "NVDA",  "kind": "weekly", "weekday": 1, "at_time": "19:00", "profile": "全量"},
+    {"code": "CRCL",  "kind": "weekly", "weekday": 1, "at_time": "19:30", "profile": "全量"},
+    {"code": "MU",    "kind": "weekly", "weekday": 1, "at_time": "20:00", "profile": "全量"},
+    {"code": "GOOGL", "kind": "weekly", "weekday": 1, "at_time": "20:30", "profile": "全量"},
+
+    {"code": "NVDA",  "kind": "daily_trading", "at_time": "20:50", "profile": "日频三件套"},
+    {"code": "CRCL",  "kind": "daily_trading", "at_time": "21:00", "profile": "日频三件套"},
+    {"code": "MU",    "kind": "daily_trading", "at_time": "21:10", "profile": "日频三件套"},
+    {"code": "GOOGL", "kind": "daily_trading", "at_time": "21:20", "profile": "日频三件套"}
+  ]
+}
