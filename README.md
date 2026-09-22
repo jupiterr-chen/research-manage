@@ -14,6 +14,7 @@ TradingAgents 多智能体框架执行,跟踪进度与状态,展示「报告是�
 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | 验收手册 AM-01~18 与 NAS 验收流程 |
 | [docs/NAS-ACCESS.md](docs/NAS-ACCESS.md) | 对 NAS 的操作边界(红线) |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 部署手册 |
+| [docs/REPORTS-FETCHER.md](docs/REPORTS-FETCHER.md) | 财报原文获取(reports-fetcher)对接:配置、本地 mock 联调、切换生产 |
 | [docs/AGENT-PLAYBOOK.md](docs/AGENT-PLAYBOOK.md) | 执行 agent 的自驱协议:判断当前步骤 → 实现 → 汇报 → 等确认 |
 | [docs/STATUS.md](docs/STATUS.md) | 进度台账(agent 维护) |
 | [CLAUDE.md](CLAUDE.md) | 给 AI agent 的项目须知 |
