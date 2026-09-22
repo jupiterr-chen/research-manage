@@ -43,7 +43,10 @@ services:
       - REPORTS_API_POLL_MAX_INTERVAL=${REPORTS_API_POLL_MAX_INTERVAL:-10}
       - REPORTS_API_LAST_N_DEFAULT=${REPORTS_API_LAST_N_DEFAULT:-4}
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # 容器内 host.docker.internal 指向 NAS 宿主(reports-fetcher 发布在该机回环 127.0.0.1:8000)
+      - "host.docker.internal:host-gateway"   # 指向 docker 网桥网关(172.17.0.1),**到不了宿主回环 127.0.0.1**(T-11);保留供其它宿主端口用
+    networks:
+      - default
+      - reports-net                            # 加入 reports-fetcher 的 compose 网络,用服务名直连(见下方 networks)
     ports:
       - "192.168.1.150:8090:8090"   # 只发布在 LAN 网卡(SPEC §8;T-02)
     healthcheck:
@@ -53,3 +56,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+networks:
+  # reports-fetcher 只发布在 NAS 宿主回环 127.0.0.1:8000,容器经 host-gateway 无法到达(T-11 实测 Connection refused)。
+  # 解法:加入其 compose 网络 reports-fetcher_default,REPORTS_API_BASE_URL=http://serve:8000(serve = 其服务名,容器内端口 8000)。
+  # 该网络由 reports-fetcher 的 compose 创建(external);若该服务未部署,请把本段与上面的 `- reports-net` 注释掉。
+  reports-net:
+    name: reports-fetcher_default
+    external: true
