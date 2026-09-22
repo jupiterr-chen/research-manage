@@ -39,6 +39,9 @@
         {% if r.coverage %}· 覆盖 {{ r.coverage.selected }}/{{ r.coverage.requested }}{% if r.coverage.insufficient_history %} <span class="chip">历史不足</span>{% endif %}{% endif %}
         {% if r.error %}· <span class="flash-error">{{ r.error.code }}{% if r.error.retryable %}(可重试){% endif %}</span>{% endif %}
       </p>
+      {% if r.coverage and r.coverage.get("notices") %}
+      <p class="muted">提示:{% for n in r.coverage.get("notices") %}{{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      {% endif %}
       {% if r.report_ids %}
       <table>
         <thead><tr><th>报告 ID</th><th>文件</th><th></th></tr></thead>

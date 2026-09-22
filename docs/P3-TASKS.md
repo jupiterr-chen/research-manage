@@ -20,6 +20,7 @@
 | T-10 | S2 | fixed(fix/T-10-schedule-skip-succeeded) | 用户 HK 调度布局复核 | 调度去重只看 queued/running:周一周频全量(06:00)已 succeeded 后,日频三件套(08:01)照常入队 → 同日第二次完整重算,子集报告覆盖全量报告、重复烧额度。AM-10 只测了同 tick 的情形 | `enqueue_scheduled` 对同 (标的,日期) 已 succeeded 的直接跳过并审计 `deduped(reason=already_succeeded)`;失败的不阻断(日频兜底);布局约定「周一周频在前、日频在后」写入 DEPLOY/页面提示 | `app/services/runs.py::enqueue_scheduled` |
 | T-11 | S1 | fixed(fix/T-11-reports-network) | v1.2 上线 | `host.docker.internal:host-gateway` 解析到网桥网关 172.17.0.1,reports-fetcher 只发布在宿主回环 127.0.0.1:8000 → 容器 Connection refused;本地 mock 测试无法暴露(Docker Desktop 的 host.docker.internal 语义不同) | 管理台加入外部网络 `reports-fetcher_default`,`REPORTS_API_BASE_URL=http://serve:8000`;文档同步 | `deploy/docker-compose.yml`、REPORTS-FETCHER.md §6、DEPLOY §8、.env.example |
 | T-12 | S2 | fixed(fix/T-12-download-filename,opencode T-0003) | 0700.HK 探针 | 代理下载只转发上游 `Content-Disposition` 的 ASCII `filename=`(中文已被上游替换成下划线),丢掉了 RFC 5987 的 `filename*=UTF-8''…`,浏览器拿到的文件名是 `unknown__INTERIM______ 2026__…pdf` | `api_archive_file` 同时输出 `filename=`(ASCII 回退)与 `filename*=UTF-8''<percent-encoded>`;`client._filename_from_disposition` 优先取 `filename*`;并把本系统代码+doc_type+filing_date 组成更可读的回退名 | `app/web/routes/reports.py::api_archive_file`、`app/reports/client.py::_filename_from_disposition` |
+| T-13 | S2 | fixed(fix/T-13-coverage-notices,opencode T-0004) | 契约更新 2026-09-22 | 新契约把「报告期未知」等聚合进 `coverage.notices`,详情页未展示、未并入 warnings | notices 并入任务 warnings(去重)+ 证券结果段展示 | `app/services/report_jobs.py::finalize_remote`、`fragments/report_job_detail.html` |
 
 ## 记录
 

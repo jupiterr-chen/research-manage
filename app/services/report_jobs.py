@@ -205,8 +205,19 @@ def finalize_remote(conn, job_id: str, doc: dict, actor: str = "web") -> dict:
     error_retryable = None
     error_text = None
     for r in results:
-        for w in r.get("warnings") or []:
-            warnings.append(f"{r.get('symbol', '?')}: {w}")
+        symbol = r.get("symbol", "?")
+        coverage = r.get("coverage")
+        notices = coverage.get("notices") if isinstance(coverage, dict) else None
+        texts = list(r.get("warnings") or [])
+        if isinstance(notices, list):
+            texts.extend(notices)
+        seen: set[str] = set()
+        for w in texts:
+            label = f"{symbol}: {w}"
+            if label in seen:
+                continue
+            seen.add(label)
+            warnings.append(label)
         report_ids.extend(r.get("report_ids") or [])
         err = r.get("error")
         if err and error_code is None:
