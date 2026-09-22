@@ -40,6 +40,7 @@
 | S7 | `feat/deploy` | S1、S2 合入 | Dockerfile、compose、部署手册、同步脚本 |
 | S8 | `feat/acceptance` | S1~S7 全部合入 | 自动化验收 + 本地验收记录 + fix/* |
 | S9 | — | S8 合入 | 打 tag `v1.0.0-rc1`,通知用户移交最终验收(P3 由验收方执行,不是你) |
+| S10 | `feat/reports-fetcher` | S9 done;分支已存在(验收方 2026-09-22 起了头) | reports-fetcher 财报原文获取对接:收尾、文档、部署配置、验收 |
 
 S1 与 S2 无相互依赖,但为了让用户每次只确认一件事,**仍按 S1 → S2 顺序做**。S3~S7 同理按序做。如果你的运行环境支持子代理且用户明确允许并行,可以把 S3~S7 并行,但汇报与确认仍按步骤逐个进行。
 
@@ -130,9 +131,56 @@ DoD:本地 compose 跑通;DEPLOY.md 完整。
 NAS 项(ACCEPTANCE §2)不由你执行,标 N/A。
 DoD:`pytest -m acceptance` 全绿;本地项全部 PASS;记录文件已提交。
 
+### S10 `feat/reports-fetcher`(v1.1 功能;分支与主体代码已存在,你做收尾)
+
+背景:用户要在管理台上手工发起「获取指定标的的历史财报原文」任务,对接 NAS 上的 reports-fetcher HTTP 服务。
+契约与联调套件已复制到仓库 `integration-kit/`(**只读**,不得修改其中任何文件来迁就客户端)。
+只获取原文与元数据,不解析财报、不提取指标、不做基本面分析。
+
+读:`integration-kit/AGENT_INSTRUCTIONS.md` → `README.md` → `API.md` → `openapi.json` → `cases.json`;
+然后读已有实现:`app/reports/{client,symbols,poller}.py`、`app/services/report_jobs.py`、
+`app/web/routes/reports.py`、`app/web/templates/reports.html` + `fragments/report_*.html`、
+`tests/unit/test_reports_unit.py`、`tests/integration/test_reports_mock.py`。
+
+**已完成(分支 @ 142534e,勿重写,只修不推翻)**:
+- 客户端(仅标准库,无 mock 概念;测试经 `default_headers=` 注入场景头)、幂等键复用、有界轮询、
+  problem+json/429 Retry-After/409、sha256 + ETag 校验、If-None-Match → 304
+- `report_job` 表 + 服务层状态机(pending/queued/running/succeeded/partial/failed/timeout/error)
+- 轮询线程 `ReportsPoller`(与 docker Worker 独立;`REPORTS_API_BASE_URL` 未配置时 no-op)
+- 页面 `/reports`、`/reports/jobs/{id}`;片段 `/fragments/reports/*`(15s 轮询);
+  JSON API `/api/v1/report-jobs*`、归档代理 `/api/v1/archive/reports*`(后端代理,令牌不下发前端)
+- 配置 `REPORTS_API_BASE_URL/TOKEN/TIMEOUT/MAX_WAIT/POLL_INTERVAL/POLL_MAX_INTERVAL/LAST_N_DEFAULT`
+- 测试:unit 23 项、对真实 mock 的集成 19 项(`-m reports_mock`),覆盖 cases.json 全部 test_cases;
+  套件基线 `docker compose -f integration-kit/compose.yaml run --rm test` = 31 OK
+
+**你要做的**:
+1. `mkdir -p .local` 后按 DESIGN §8 起本地环境;`docker compose -f integration-kit/compose.yaml up -d mock`;
+   跑 `pytest tests/unit`、`pytest -m reports_mock tests/integration/test_reports_mock.py`、`ruff`,确认全绿(如实记录)。
+2. 补齐交付物:
+   - `docs/REPORTS-FETCHER.md`:功能说明、配置项表、本地 mock 启动/测试命令与结果、
+     **从 mock 切换真实服务**(生产 reports-fetcher 在 NAS `127.0.0.1:8000`,管理台容器与它同机:
+     base URL 用 `http://host.docker.internal:8000` + compose `extra_hosts: host.docker.internal:host-gateway`,
+     或 `network_mode`/宿主 IP,**不要把容器 127.0.0.1 当宿主**;切换只改环境变量,不改代码;
+     切换时不得存在任何 `X-Mock-Scenario`/`/__mock/*`;首次验证只做只读 `GET /health/ready`、`GET /api/v1/reports`,
+     再做一次显式小任务 `last_n=1, refresh=false` 并读 warnings)、故障排查。
+   - `deploy/.env.example`、`deploy/docker-compose.yml`(注释形式的 REPORTS_API_* 与 extra_hosts,默认不启用)、
+     `deploy/docker-compose.local.yml`(可选:加入 mock 服务或说明如何连宿主 18765)。
+   - DESIGN §3 配置表补 REPORTS_API_*;REQUIREMENTS 增加 M10 RPT 需求条目(R-RPT-*);
+     ACCEPTANCE 增加 AM-19~(mock 场景 success/partial/failed/no_reports/queue_full/slow、幂等重放、参数错误、
+     未知报告、文件校验、有界超时;NAS 侧只读健康检查 + 一次小任务);SPEC.md 附 B 记 v1.2 变更。
+   - `tests/unit/test_web_ui.py` 的无外链/无 `|safe` 扫描应已覆盖新模板,确认;若页面测试有单独清单,把 `/reports` 加进去。
+3. 代码复核(只修问题,不重构):并发提交同标的的竞态(服务层用事务内查重,确认 `BEGIN IMMEDIATE` 足够);
+   `_page_ctx` 重复查询 `list_jobs`;`report_job_detail.html` 里 `selectattr("equalto")` 在 `items` 缺失时的健壮性;
+   下载代理对大文件是整体读入内存(可接受,写明上限或流式化的取舍)。
+4. **不要**部署到 NAS、不要连接生产 reports-fetcher、不要修改 `integration-kit/`。
+DoD:`pytest tests/unit` 与 `-m reports_mock` 全绿;ruff 零告警;文档三件齐;汇报里附测试输出摘要。
+
 ### S9 移交
 
 develop 打 tag `v1.0.0-rc1` 并 push;STATUS.md 全部 done;汇报中写明:「开发阶段完成,请将 P3(NAS 验收与生产部署)交给最终验收方,入口 docs/ACCEPTANCE.md §2 与 docs/ROADMAP.md §3 P3」。
+
+(S9 之后新增的功能步骤,如 S10,同样按 §1 协议执行:完成 → 汇报 → 等确认 → 合入 develop。
+v1.0 已上线,合入 develop 后是否同步到 `release/v1.0` 并部署由验收方决定,不是你。)
 
 ## 3. 汇报格式(每步完成后,原样输出)
 

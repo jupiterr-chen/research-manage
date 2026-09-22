@@ -13,8 +13,16 @@
 | S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
 | S8 | feat/acceptance | done | a66f444 | 86ec931 (merge) | 2026-09-15 用户确认;AM-05 审计留痕偏差经用户决定忽略 |
 | S9 | 移交(tag v1.0.0-rc1) | done | 49e160d | tag v1.0.0-rc1 | 2026-09-15 开发阶段完成,移交 P3 |
+| S10 | feat/reports-fetcher | in_progress | 142534e | | 2026-09-22 验收方起头(客户端/服务/轮询/页面/API/测试已在分支);待开发 agent 收尾:文档、部署配置、验收项 |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S10 feat/reports-fetcher — in_progress(2026-09-22,验收方交接)
+
+- 已在分支:`app/reports/`(client/symbols/poller)、`app/services/report_jobs.py`、`app/web/routes/reports.py`、
+  模板 4 个、`report_job` 表、`REPORTS_API_*` 配置、`integration-kit/` 只读副本。
+- 测试:unit 23 + 对真实 mock 集成 19(`-m reports_mock`)全绿;套件基线 31 OK;ruff 零告警。
+- 待办见 AGENT-PLAYBOOK §2 S10「你要做的」。
 
 ### S9 移交 — done(2026-09-15)
 
