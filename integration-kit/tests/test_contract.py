@@ -179,6 +179,33 @@ class KitTestCase(unittest.TestCase):
         self.assertEqual(status, 304)
         self.assertEqual(body, b"")
 
+    def test_progress_total_from_queued(self):
+        """symbols_total is the normalized submitted count before any result."""
+        _, accepted = self.client.submit_job(
+            ["AAPL", "600519", "aapl"], last_n=1, scenario="slow",
+            idempotency_key="prog-1")
+        status, _, body = raw(
+            "GET", f"/api/v1/fetch-jobs/{accepted['job_id']}")
+        self.assertEqual(status, 200)
+        doc = parse(body)
+        self.assertIn(doc["status"], ("queued", "running"), doc["status"])
+        # AAPL/aapl collapse to one; 600519 stays -> 2 normalized symbols
+        self.assertEqual(doc["progress"]["symbols_total"], 2)
+        self.assertEqual(doc["progress"]["symbols_finished"], 0)
+
+    def test_download_disposition_readable(self):
+        _, accepted = self.client.submit_job(
+            ["AAPL"], last_n=1, idempotency_key="disp-1")
+        self.client.wait_for_terminal(accepted["job_id"])
+        item = self.client.list_reports(market="US", symbol="AAPL")["items"][0]
+        blob = self.client.download_report_file(item["report_id"])
+        disposition = blob["content_disposition"]
+        for token in (item["market"], item["symbol"], item["doc_type"],
+                      item["report_period"], item["report_id"]):
+            self.assertIn(token, disposition)
+        self.assertIn("filename*=UTF-8''", disposition)
+        self.assertIn(".html", disposition)
+
     def test_job_progression_queued_running_terminal(self):
         _, accepted = self.client.submit_job(["AAPL"], last_n=1)
         seen = []

@@ -336,7 +336,7 @@
                 "schema": {"type": "string"}
               },
               "Content-Disposition": {
-                "description": "attachment; filename=...",
+                "description": "attachment; filename=\"{market}_{symbol}_{doc_type}_{report_period|filing_date|unknown}_{report_id}.{ext}\" (historical, non-current artifact appends artifact_id); also carries filename* UTF-8.",
                 "schema": {"type": "string"}
               },
               "Content-Length": {"schema": {"type": "integer"}},
@@ -477,7 +477,15 @@
           "started_at": {"type": ["string", "null"], "format": "date-time"},
           "finished_at": {"type": ["string", "null"], "format": "date-time"},
           "deadline": {"type": ["string", "null"], "format": "date-time"},
-          "progress": {"type": "object", "additionalProperties": true},
+          "progress": {
+            "type": "object",
+            "description": "symbols_total = normalized submitted-symbol count (correct from queued); symbols_finished = count of persisted per-symbol results.",
+            "properties": {
+              "symbols_total": {"type": "integer", "minimum": 0},
+              "symbols_finished": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": true
+          },
           "summary": {"type": "object", "additionalProperties": true},
           "results": {
             "type": "array",
@@ -501,7 +509,7 @@
           "report_period": {"type": ["string", "null"], "format": "date"},
           "period_source": {"type": "string",
                             "enum": ["source_field", "explicit_title",
-                                     "unknown"]},
+                                     "document", "unknown"]},
           "filing_date": {"type": ["string", "null"], "format": "date"},
           "language": {"type": ["string", "null"]},
           "is_amendment": {"type": "boolean", "default": false},
@@ -556,7 +564,7 @@
           "report_period": {"type": ["string", "null"], "format": "date"},
           "period_source": {"type": "string",
                             "enum": ["source_field", "explicit_title",
-                                     "unknown"]},
+                                     "document", "unknown"]},
           "filing_date": {"type": ["string", "null"], "format": "date"},
           "language": {"type": ["string", "null"]},
           "is_amendment": {"type": "boolean", "default": false},

@@ -212,8 +212,14 @@
   "file_notes": {
     "bytes": "The file endpoint returns real fixture bytes, not JSON.",
     "headers": ["Content-Type", "Content-Length", "Content-Disposition", "ETag", "X-Content-Type-Options: nosniff"],
+    "content_disposition": "Readable, deterministic: {market}_{symbol}_{doc_type}_{report_period|filing_date|unknown}_{report_id}.{ext}; historical (non-current artifact) appends artifact_id. Also carries filename*=UTF-8''. Do not rely on any fixed legacy filename.",
     "etag": "quoted SHA-256 of the bytes",
     "mime": "CN/HK reports are application/pdf, US reports are text/html in the mock",
     "synthetic": "All mock fixture files are clearly marked MOCK and are NOT real financial information."
+  },
+  "progress_contract": {
+    "symbols_total": "Normalized submitted-symbol count, correct from queued onward (not derived from persisted results).",
+    "symbols_finished": "Count of persisted per-symbol results.",
+    "example_single_running": {"symbols_total": 1, "symbols_finished": 0}
   }
 }
