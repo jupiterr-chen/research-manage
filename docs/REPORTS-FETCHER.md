@@ -125,14 +125,15 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 
 **只改环境变量,不改代码。** 生产 reports-fetcher 在 NAS 宿主 `192.168.1.150`,只发布在该机回环 `127.0.0.1:8000`,当前无 token。
 
-- **base URL 的容器写法**:管理台生产容器也跑在 NAS 上,但**容器内的 `127.0.0.1` 是容器自己,不是 NAS 宿主**。因此:
+- **base URL 的容器写法**:管理台生产容器也跑在 NAS 上,但**容器内的 `127.0.0.1` 是容器自己,不是 NAS 宿主**;而 `host.docker.internal:host-gateway` 解析到的是 docker 网桥网关(172.17.0.1),**到不了宿主回环 127.0.0.1:8000**(2026-09-22 上线实测 Connection refused,T-11)。生产采用的写法:管理台容器加入 reports-fetcher 的 compose 网络 `reports-fetcher_default`(`deploy/docker-compose.yml` 的 `networks: reports-net`,external),用它的服务名直连:
 
   ```bash
-  REPORTS_API_BASE_URL=http://host.docker.internal:8000
+  REPORTS_API_BASE_URL=http://serve:8000
   ```
 
-  并在 compose 中给 `agents-manage` 服务加 `extra_hosts: ["host.docker.internal:host-gateway"]`(`deploy/docker-compose.yml` 已加;Linux Docker 28+ 与 Docker Desktop 均可用)。这样容器经宿主网关访问到 NAS 宿主回环上的 reports-fetcher。
-- 若采用 SSH 隧道方案(套件 README §7),隧道监听在宿主回环,容器侧同样用 `http://host.docker.internal:<宿主隧道端口>`,**不要把容器 `127.0.0.1` 当宿主**。
+  `serve` = reports-fetcher compose 里的服务名(容器 `reports-fetcher-serve-1`,容器内端口 8000)。这不修改 reports-fetcher 任何内容,只是加入其网络。
+- 前提:reports-fetcher 已 up(网络存在);否则管理台 `compose up` 会因外部网络缺失失败,此时把 compose 里 `reports-net` 两处注释掉,功能保持关闭。
+- 若将来 reports-fetcher 改为发布在宿主非回环地址(如 `192.168.1.150:8000`),可改用 `http://192.168.1.150:8000`。SSH 隧道方案(套件 README §7)同理:隧道监听在宿主回环时容器也到不了,需监听在网桥可达地址。
 
 **切换前检查清单**:
 - [ ] 不设置任何 `X-Mock-Scenario`,不调用任何 `/__mock/*`(`app/` 代码中本就不含这些;确认没有外部注入)。

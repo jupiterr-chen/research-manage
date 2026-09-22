@@ -18,6 +18,7 @@
 | T-08 | S3 | open | P3 第 4 步 | 成功终态时 `current_agent` 停留在 `Aggressive Analyst`(12/12 已完成),不是最后一个节点 `Portfolio Manager` 或空;推测 runner 的 risk 团队三节点合并计数时未更新 current_agent | 终态 `phase=succeeded` 时 `current_agent` 置 null 或最后完成的 agent;页面显示"已完成" | `runner/runner.py` 状态映射 |
 | T-09 | S3 | open | 用户提问 | 调度 `at_time` 输入框未标注时区(固定 Asia/Shanghai),添加美股时易误填美东时间 | 标签改为「时间(北京)」,`describe()` 文案加「北京时间」;DESIGN §3 已注明 | `app/web/templates/fragments/instruments_block.html`、`app/services/schedules.py::describe` |
 | T-10 | S2 | fixed(fix/T-10-schedule-skip-succeeded) | 用户 HK 调度布局复核 | 调度去重只看 queued/running:周一周频全量(06:00)已 succeeded 后,日频三件套(08:01)照常入队 → 同日第二次完整重算,子集报告覆盖全量报告、重复烧额度。AM-10 只测了同 tick 的情形 | `enqueue_scheduled` 对同 (标的,日期) 已 succeeded 的直接跳过并审计 `deduped(reason=already_succeeded)`;失败的不阻断(日频兜底);布局约定「周一周频在前、日频在后」写入 DEPLOY/页面提示 | `app/services/runs.py::enqueue_scheduled` |
+| T-11 | S1 | fixed(fix/T-11-reports-network) | v1.2 上线 | `host.docker.internal:host-gateway` 解析到网桥网关 172.17.0.1,reports-fetcher 只发布在宿主回环 127.0.0.1:8000 → 容器 Connection refused;本地 mock 测试无法暴露(Docker Desktop 的 host.docker.internal 语义不同) | 管理台加入外部网络 `reports-fetcher_default`,`REPORTS_API_BASE_URL=http://serve:8000`;文档同步 | `deploy/docker-compose.yml`、REPORTS-FETCHER.md §6、DEPLOY §8、.env.example |
 
 ## 记录
 

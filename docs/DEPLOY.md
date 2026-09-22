@@ -147,8 +147,8 @@ ssh chen@192.168.1.150 "cp /home/chen/docker/agents-manage/data/backup.db \
 
 管理台可选对接 NAS 上的 reports-fetcher,提供「获取指定标的的历史财报原文」功能。生产只改环境变量即可启用:
 
-- 在 `deploy/.env` 设 `REPORTS_API_BASE_URL=http://host.docker.internal:8000`(不含 `/api/v1`;NAS 宿主回环的 8000),其余 `REPORTS_API_*` 用默认值即可。
-- 生产 compose 已含 `extra_hosts: ["host.docker.internal:host-gateway"]`(Linux Docker 28+ 与 Docker Desktop 均可用),容器即可访问 NAS 宿主回环上的服务。
+- 在 `deploy/.env` 设 `REPORTS_API_BASE_URL=http://serve:8000`(不含 `/api/v1`;`serve` 是 reports-fetcher compose 的服务名,容器内端口 8000),其余 `REPORTS_API_*` 用默认值即可。
+- 生产 compose 把 `agents-manage` 加入了外部网络 `reports-fetcher_default`(T-11):reports-fetcher 只发布在 NAS 宿主回环 `127.0.0.1:8000`,`host.docker.internal`(网桥网关 172.17.0.1)到不了它,实测 Connection refused。前提:reports-fetcher 的 compose 已 up(网络存在),否则 `docker compose up` 会因外部网络缺失而失败——此时注释掉 compose 里的 `reports-net` 两处。
 - 回退:清空 `REPORTS_API_BASE_URL` 即关闭功能,无需改代码。
 
 完整说明(功能范围、配置项、本地 mock 联调、切换生产检查清单与首次验证顺序、排查)见 [REPORTS-FETCHER.md](REPORTS-FETCHER.md) §6。部署后看 `/healthz` 的 `reports.enabled` / `reports.reachable`。
