@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import re
+import urllib.parse
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Query, Request, Response
@@ -403,10 +405,21 @@ async def api_archive_file(request: Request, report_id: str, artifact_id: str | 
         return _upstream_error(exc)
     if result["status"] == 304:
         return Response(status_code=304, headers={"ETag": result["etag"] or ""})
-    filename = result["filename"] or f"{report_id}.bin"
+    upstream_name = result["filename"]
+    meta: dict = {"report_id": report_id}
+    if not _is_readable_upstream_name(upstream_name):
+        try:
+            meta = client.get_report(report_id)
+        except (ProblemError, ConnectionFailed, RequestTimeout):
+            meta = {"report_id": report_id}
+    filename = _build_filename(meta, upstream_name, result["media_type"])
+    disposition = (
+        f'attachment; filename="{_ascii_filename(filename)}"; '
+        f"filename*=UTF-8''{urllib.parse.quote(filename, safe='')}"
+    )
     headers = {
         "ETag": result["etag"] or f'"{result["sha256"]}"',
-        "Content-Disposition": f'attachment; filename="{_ascii_filename(filename)}"',
+        "Content-Disposition": disposition,
         "X-Content-Type-Options": "nosniff",
         "X-Checksum-SHA256": result["sha256"],
         "Cache-Control": "private, no-cache",
@@ -418,8 +431,62 @@ async def api_archive_file(request: Request, report_id: str, artifact_id: str | 
     )
 
 
+_MEDIA_TYPE_EXT = {"application/pdf": "pdf", "text/html": "html"}
+_SAFE_FILENAME_RE = re.compile(r"[^0-9A-Za-z._\-\u4e00-\u9fff]")
+
+
+def _is_readable_upstream_name(name: str | None) -> bool:
+    """上游名可读:非空、不以 `unknown__` 开头、去扩展名后含字母数字或中文。"""
+    if not name or name.startswith("unknown__"):
+        return False
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return re.search(r"[0-9A-Za-z\u4e00-\u9fff]", stem) is not None
+
+
+def _ext_from_media_type(media_type: str | None) -> str:
+    base = (media_type or "").split(";", 1)[0].strip().lower()
+    return _MEDIA_TYPE_EXT.get(base, "bin")
+
+
+def _local_code(market: str | None, symbol: str | None) -> str | None:
+    """上游规范化 symbol → 本系统代码形式(港股 `00700`→`0700.HK`);失败用上游原样。"""
+    if not symbol:
+        return None
+    local = symbols.LOCAL_MARKET.get((market or "").upper())
+    if not local:
+        return symbol
+    try:
+        if local == "hk":
+            return models.normalize_code("hk", f"{int(symbol.split('.', 1)[0])}.HK")
+        return models.normalize_code(local, symbol)
+    except (ValueError, TypeError):
+        return symbol
+
+
+def _build_filename(report: dict | None, upstream_name: str | None, media_type: str | None) -> str:
+    """可读上游名原样(经清洗)使用;否则组装 `<market>_<code>_<doc_type>_<date>_<report_id>.<ext>`。"""
+    ext = _ext_from_media_type(media_type)
+    if _is_readable_upstream_name(upstream_name):
+        return _sanitize_filename(upstream_name) or f"report.{ext}"
+    meta = report or {}
+    segments = (
+        meta.get("market"),
+        _local_code(meta.get("market"), meta.get("symbol")),
+        meta.get("doc_type"),
+        meta.get("report_period") or meta.get("filing_date"),
+        meta.get("report_id"),
+    )
+    stem = "_".join(str(s) for s in segments if s) or "report"
+    return _sanitize_filename(f"{stem}.{ext}")
+
+
+def _sanitize_filename(name: str, *, limit: int = 150) -> str:
+    return _SAFE_FILENAME_RE.sub("_", name)[:limit]
+
+
 def _ascii_filename(name: str) -> str:
     safe = "".join(ch if ch.isascii() and ch.isprintable() and ch not in '"\\/' else "_" for ch in name)
+    safe = re.sub(r"_{2,}", "_", safe)
     return safe or "report.bin"
 
 

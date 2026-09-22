@@ -120,6 +120,7 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 | 空结果合法 | `succeeded` + 证券 `no_reports` 是合法终态,页面提示「来源检索完成但没有匹配报告」 | `app/services/report_jobs.py::finalize_remote`;`app/web/templates/fragments/report_job_detail.html` |
 | sha256 / ETag 校验 | 下载后计算 sha256,与给出的 `expected_sha256` 及响应 `ETag` 比对,不一致抛 `ChecksumMismatch` | `app/reports/client.py::download_report_file` |
 | `If-None-Match` → 304 | 命中则无 body 返回 304,不重复下载 | `app/reports/client.py::download_report_file`;`app/web/routes/reports.py::api_archive_file` |
+| 下载文件名 | 优先级:上游 `filename*=UTF-8''…`(RFC 5987,含中文)→ 上游 ASCII `filename=` → 本系统组装名。可读上游名原样转发(经清洗);不可读(空/`unknown__` 前缀/无字母数字)时组装 `<market>_<code>_<doc_type>_<日期>_<report_id>.<ext>`,日期取 `report_period`(空则 `filing_date`,再无则省略该段),`code` 为港股 `0700.HK` 等本系统形式,`ext` 由 `Content-Type` 决定(pdf/html/bin)。响应按 RFC 6266 同时给 ASCII 回退 `filename=`(非 ASCII→`_` 并折叠连续 `_`)与 `filename*=UTF-8''<percent-encoded>` | `app/reports/client.py::_filename_from_disposition`;`app/web/routes/reports.py::_build_filename` / `api_archive_file` |
 
 ## 6. 切换到生产(NAS)
 
@@ -172,4 +173,5 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 - **下载代理整体读入内存**:`api_archive_file` 把上游文件一次性读入内存再回给浏览器(`Response(content=result["content"])`),适合单份财报体量;超大文件无流式/断点续传,后续如需大文件可改流式代理。
 - **同一标的同时只允许一个活动任务**:`report_jobs.create` 在事务内查重,同市场同代码存在 `pending/queued/running` 任务时返回 409。不同标的可并行。
 - **v1 不做定时获取**:只有页面/API 手工发起(`trigger ∈ {web, api}`),没有调度集成。
+- **下载文件名以上游为准且形态不稳定**:上游 `Content-Disposition` 可能是 `unknown__…`(缺代码、`report_period=null`)或只给 ASCII;管理台优先转发可读名,否则用本系统元数据组装回退名并始终给出 `filename*`,不修改上游文件本身。元数据(`get_report`)取不到时退化为 `<report_id>.<ext>`,不影响下载。
 - 依赖 `integration-kit` 契约(reports-fetcher v1.0.1);契约变更需同步升级客户端。

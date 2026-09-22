@@ -288,14 +288,26 @@ class ReportsClient:
 
 
 def _filename_from_disposition(value: str | None) -> str | None:
+    """RFC 6266:优先 `filename*`(RFC 5987 编码,含中文),无效时才用 ASCII `filename=`。"""
     if not value:
         return None
+    extended = plain = None
     for part in value.split(";"):
         part = part.strip()
-        if part.lower().startswith("filename*="):
-            enc = part.split("=", 1)[1]
-            if "''" in enc:
-                return urllib.parse.unquote(enc.split("''", 1)[1])
-        if part.lower().startswith("filename="):
-            return part.split("=", 1)[1].strip().strip('"')
-    return None
+        lowered = part.lower()
+        if lowered.startswith("filename*="):
+            extended = _decode_extended_filename(part.split("=", 1)[1])
+        elif lowered.startswith("filename="):
+            plain = part.split("=", 1)[1].strip().strip('"')
+    return extended or plain or None
+
+
+def _decode_extended_filename(raw: str) -> str | None:
+    """`<charset>''<pct-encoded>` → str;charset 缺省 UTF-8,解码失败返回 None。"""
+    charset, sep, encoded = raw.strip().strip('"').partition("''")
+    if not sep:
+        return None
+    try:
+        return urllib.parse.unquote(encoded, encoding=charset or "utf-8", errors="strict")
+    except (LookupError, UnicodeDecodeError):
+        return None
