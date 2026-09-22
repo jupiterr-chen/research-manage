@@ -5,6 +5,10 @@
 
 from __future__ import annotations
 
+import hashlib
+from contextlib import contextmanager
+from urllib.parse import quote
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -12,11 +16,12 @@ from app import db as app_db
 from app.config import Settings
 from app.db import connect
 from app.reports import symbols
-from app.reports.client import ConnectionFailed, ProblemError
+from app.reports.client import ConnectionFailed, ProblemError, _filename_from_disposition
 from app.reports.poller import ReportsPoller
 from app.services import instruments as inst_srv
 from app.services import report_jobs as rj
 from app.services.errors import ConflictError, NotFound, ValidationError
+from app.web.routes.reports import _build_filename
 from app.web.server import create_app
 from tests.conftest import FakeLauncher
 
@@ -401,3 +406,186 @@ class TestReportJobDetailRender:
         r = disabled_client.get(f"/reports/jobs/{jid}")
         assert r.status_code == 200
         assert "r_1" in r.text and "r_2" in r.text
+
+
+# ---------------------------------------------------------------- 下载文件名(T-12)
+
+
+class TestDispositionFilename:
+    def test_only_filename(self):
+        assert _filename_from_disposition('attachment; filename="a.pdf"') == "a.pdf"
+
+    def test_only_filename_star(self):
+        v = "attachment; filename*=UTF-8''%E4%B8%AD%E6%96%87.pdf"
+        assert _filename_from_disposition(v) == "中文.pdf"
+
+    def test_both_star_before_plain(self):
+        v = "attachment; filename*=UTF-8''%E4%B8%AD%E6%96%87.pdf; filename=\"a.pdf\""
+        assert _filename_from_disposition(v) == "中文.pdf"
+
+    def test_both_plain_before_star(self):
+        v = "attachment; filename=\"a.pdf\"; filename*=UTF-8''%E4%B8%AD%E6%96%87.pdf"
+        assert _filename_from_disposition(v) == "中文.pdf"
+
+    def test_broken_star_falls_back_to_plain(self):
+        v = "attachment; filename=\"a.pdf\"; filename*=UTF-8''%FF"
+        assert _filename_from_disposition(v) == "a.pdf"
+
+    def test_broken_star_only_returns_none(self):
+        assert _filename_from_disposition("attachment; filename*=UTF-8''%FF") is None
+
+    def test_unknown_charset_returns_none(self):
+        assert _filename_from_disposition("attachment; filename*=X-NOPE''%41") is None
+
+    def test_empty_or_none(self):
+        assert _filename_from_disposition(None) is None
+        assert _filename_from_disposition("") is None
+
+
+class TestBuildFilename:
+    def test_readable_upstream_used_as_is(self):
+        assert _build_filename({"report_id": "r_1"}, "AAPL_10-Q.pdf", "application/pdf") == "AAPL_10-Q.pdf"
+
+    def test_unknown_prefix_assembled_from_metadata(self):
+        report = {
+            "report_id": "r_1",
+            "market": "HK",
+            "symbol": "00700",
+            "doc_type": "INTERIM",
+            "report_period": "2026-06-30",
+            "filing_date": "2026-08-14",
+        }
+        assert (
+            _build_filename(report, "unknown__INTERIM__r_1.pdf", "application/pdf")
+            == "HK_0700.HK_INTERIM_2026-06-30_r_1.pdf"
+        )
+
+    def test_null_period_uses_filing_date(self):
+        report = {
+            "report_id": "r_2",
+            "market": "HK",
+            "symbol": "00700",
+            "doc_type": "INTERIM",
+            "report_period": None,
+            "filing_date": "2026-08-14",
+        }
+        assert _build_filename(report, None, "application/pdf") == "HK_0700.HK_INTERIM_2026-08-14_r_2.pdf"
+
+    def test_no_date_segment_omitted_and_html_ext(self):
+        report = {"report_id": "r_3", "market": "US", "symbol": "AAPL", "doc_type": "10-K"}
+        assert _build_filename(report, None, "text/html") == "US_AAPL_10-K_r_3.html"
+
+    def test_missing_metadata_falls_back_to_id_and_ext(self):
+        assert _build_filename({"report_id": "r_4"}, None, "application/pdf") == "r_4.pdf"
+        assert _build_filename(None, None, "application/octet-stream") == "report.bin"
+
+    def test_sanitizes_spaces_and_separators(self):
+        name = _build_filename({"report_id": "r_5"}, "my report/2026.pdf", "application/pdf")
+        assert name == "my_report_2026.pdf"
+
+    def test_length_capped_at_150(self):
+        assert len(_build_filename({"report_id": "r_6"}, "a" * 200 + ".pdf", "application/pdf")) == 150
+
+
+class _FakeArchiveClient:
+    """代理下载单测用:固定下载结果 + 记录 get_report 调用次数。"""
+
+    def __init__(self, *, filename, media_type="application/pdf", report=None, report_error=None):
+        content = b"%PDF-1.4 fake"
+        digest = hashlib.sha256(content).hexdigest()
+        self.result = {
+            "status": 200,
+            "content": content,
+            "sha256": digest,
+            "etag": f'"{digest}"',
+            "media_type": media_type,
+            "filename": filename,
+            "content_length": len(content),
+        }
+        self.report = report
+        self.report_error = report_error
+        self.get_report_calls = 0
+
+    def download_report_file(self, report_id, *, artifact_id=None, if_none_match=None):
+        return self.result
+
+    def get_report(self, report_id):
+        self.get_report_calls += 1
+        if self.report_error is not None:
+            raise self.report_error
+        return self.report
+
+
+class _FakePoller:
+    def __init__(self, client):
+        self.client = client
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def health(self):
+        return {"enabled": True, "alive": True, "reachable": True, "active": 0, "last_error": None}
+
+
+@contextmanager
+def _archive_client(settings, client):
+    from pathlib import Path as _P
+
+    from app.executor.worker import Worker
+
+    _P(settings.ta_data_dir).mkdir(parents=True, exist_ok=True)
+    worker = Worker(settings, launcher=FakeLauncher(), db_factory=lambda: connect(settings.db_path))
+    app = create_app(settings, worker=worker, reports_poller=_FakePoller(client))
+    with TestClient(app) as tc:
+        tc.headers.update({"Authorization": f"Bearer {settings.token}"})
+        yield tc
+
+
+class TestArchiveFileHeaders:
+    def test_readable_upstream_forwarded_without_second_call(self, settings):
+        client = _FakeArchiveClient(filename="AAPL_10-Q_2026-06-30.pdf")
+        with _archive_client(settings, client) as tc:
+            r = tc.get("/api/v1/archive/reports/r_1/file")
+        assert r.status_code == 200
+        cd = r.headers["Content-Disposition"]
+        assert 'filename="AAPL_10-Q_2026-06-30.pdf"' in cd
+        assert "filename*=UTF-8''AAPL_10-Q_2026-06-30.pdf" in cd
+        assert client.get_report_calls == 0
+
+    def test_chinese_upstream_name_gets_rfc5987_and_ascii_fallback(self, settings):
+        client = _FakeArchiveClient(filename="中期報告.pdf")
+        with _archive_client(settings, client) as tc:
+            r = tc.get("/api/v1/archive/reports/r_zh/file")
+        cd = r.headers["Content-Disposition"]
+        assert 'filename="_.pdf"' in cd
+        assert f"filename*=UTF-8''{quote('中期報告.pdf', safe='')}" in cd
+
+    def test_unknown_prefix_assembles_from_metadata(self, settings):
+        client = _FakeArchiveClient(
+            filename="unknown__INTERIM__r_1.pdf",
+            report={
+                "report_id": "r_1",
+                "market": "HK",
+                "symbol": "00700",
+                "doc_type": "INTERIM",
+                "report_period": "2026-06-30",
+                "filing_date": "2026-08-14",
+            },
+        )
+        with _archive_client(settings, client) as tc:
+            r = tc.get("/api/v1/archive/reports/r_1/file")
+        assert client.get_report_calls == 1
+        assert "filename*=UTF-8''HK_0700.HK_INTERIM_2026-06-30_r_1.pdf" in r.headers["Content-Disposition"]
+
+    def test_metadata_failure_still_downloads(self, settings):
+        client = _FakeArchiveClient(
+            filename="unknown__.pdf",
+            report_error=ProblemError(503, {"code": "unavailable", "detail": "down"}),
+        )
+        with _archive_client(settings, client) as tc:
+            r = tc.get("/api/v1/archive/reports/r_9/file")
+        assert r.status_code == 200
+        assert "filename*=UTF-8''r_9.pdf" in r.headers["Content-Disposition"]

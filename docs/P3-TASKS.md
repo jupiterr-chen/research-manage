@@ -19,6 +19,7 @@
 | T-09 | S3 | open | 用户提问 | 调度 `at_time` 输入框未标注时区(固定 Asia/Shanghai),添加美股时易误填美东时间 | 标签改为「时间(北京)」,`describe()` 文案加「北京时间」;DESIGN §3 已注明 | `app/web/templates/fragments/instruments_block.html`、`app/services/schedules.py::describe` |
 | T-10 | S2 | fixed(fix/T-10-schedule-skip-succeeded) | 用户 HK 调度布局复核 | 调度去重只看 queued/running:周一周频全量(06:00)已 succeeded 后,日频三件套(08:01)照常入队 → 同日第二次完整重算,子集报告覆盖全量报告、重复烧额度。AM-10 只测了同 tick 的情形 | `enqueue_scheduled` 对同 (标的,日期) 已 succeeded 的直接跳过并审计 `deduped(reason=already_succeeded)`;失败的不阻断(日频兜底);布局约定「周一周频在前、日频在后」写入 DEPLOY/页面提示 | `app/services/runs.py::enqueue_scheduled` |
 | T-11 | S1 | fixed(fix/T-11-reports-network) | v1.2 上线 | `host.docker.internal:host-gateway` 解析到网桥网关 172.17.0.1,reports-fetcher 只发布在宿主回环 127.0.0.1:8000 → 容器 Connection refused;本地 mock 测试无法暴露(Docker Desktop 的 host.docker.internal 语义不同) | 管理台加入外部网络 `reports-fetcher_default`,`REPORTS_API_BASE_URL=http://serve:8000`;文档同步 | `deploy/docker-compose.yml`、REPORTS-FETCHER.md §6、DEPLOY §8、.env.example |
+| T-12 | S2 | fixed(fix/T-12-download-filename,opencode T-0003) | 0700.HK 探针 | 代理下载只转发上游 `Content-Disposition` 的 ASCII `filename=`(中文已被上游替换成下划线),丢掉了 RFC 5987 的 `filename*=UTF-8''…`,浏览器拿到的文件名是 `unknown__INTERIM______ 2026__…pdf` | `api_archive_file` 同时输出 `filename=`(ASCII 回退)与 `filename*=UTF-8''<percent-encoded>`;`client._filename_from_disposition` 优先取 `filename*`;并把本系统代码+doc_type+filing_date 组成更可读的回退名 | `app/web/routes/reports.py::api_archive_file`、`app/reports/client.py::_filename_from_disposition` |
 
 ## 记录
 
@@ -27,3 +28,4 @@
 - 2026-09-15 T-06:由验收方修复(3 行 + 回归测试),理由:阻塞真实运行且改动边界清晰;`tests/conftest.py::make_settings` 默认 HOST=DIR 是测试盲区,建议开发 agent 在 T-05 代码项一并把 conftest 默认改为 HOST≠DIR。
 - 2026-09-15 T-07:由验收方修复;AM-07 的本地验收(FAKEKEY 假值)之所以没抓到,是因为 sim 与 llm-stub 不会像真实上游那样把带 key 的 URL 打进日志——建议开发 agent 在 sim 的 `fail` 模式里加一行含 `api_key=` 的 stderr 输出,让 AM-07 本地用例覆盖该形态。
 - 2026-09-16 T-10:由验收方修复(用户调整 HK 调度为周频早于日频后暴露;09-21 周一前必须上线)。附带交付 `scripts/apply_schedules.py`(经 HTTP 接口批量建调度,幂等)与 `deploy/schedules/us-2026-09-16.json`。
+- 2026-09-22 T-12:上游其实给了正确的 `filename*`(UTF-8 中文),丑名字一半是本系统代理丢字段造成;另一半(`unknown__` 前缀、无代码、report_period=null)属 reports-fetcher,已整理成问题清单交用户转给该项目。

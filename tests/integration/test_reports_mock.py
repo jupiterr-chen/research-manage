@@ -19,6 +19,7 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -369,6 +370,9 @@ class TestAppEndToEnd:
             f = tc.get(f"/api/v1/archive/reports/{rid}/file")
             assert f.status_code == 200 and f.headers["X-Checksum-SHA256"] == sha
             assert f.headers["ETag"] == f'"{sha}"' and "attachment" in f.headers["Content-Disposition"]
+            cd = f.headers["Content-Disposition"]
+            assert "filename*=UTF-8''" in cd
+            assert unquote(cd.split("filename*=UTF-8''", 1)[1]).endswith(".pdf")
             assert hashlib.sha256(f.content).hexdigest() == sha
             assert f.headers["Content-Type"].startswith("application/pdf")
             f304 = tc.get(f"/api/v1/archive/reports/{rid}/file", headers={"If-None-Match": f.headers["ETag"]})
