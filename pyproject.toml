@@ -39,5 +39,6 @@ markers = [
   "acceptance: acceptance cases mapped to docs/ACCEPTANCE.md",
   "shape: needs vendor/ copied read-only from NAS (contract parity)",
   "real: needs tradingagents-local:latest (built from vendor/) and llm-stub",
+  "reports_mock: needs reports-fetcher mock at 127.0.0.1:18765 (integration-kit/compose.yaml)",
 ]
 addopts = "-ra"

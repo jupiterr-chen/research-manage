@@ -1,0 +1,27 @@
+<div id="archive-region">
+  {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
+  {% if items %}
+  <table>
+    <thead><tr><th>市场/代码</th><th>类型</th><th>报告期</th><th>披露日</th><th>标题</th><th>大小</th><th></th></tr></thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td class="mono">{{ it.market }} {{ it.symbol }}</td>
+        <td class="mono">{{ it.doc_type }}</td>
+        <td class="mono">{% if it.report_period %}{{ it.report_period }}{% else %}<span class="badge stale" title="period_source=unknown,不推测日期">未知</span>{% endif %}</td>
+        <td class="mono">{{ it.filing_date or '—' }}</td>
+        <td>{{ it.title or '—' }}{% if it.warnings %} <span class="badge stale" title="{{ it.warnings | join('; ') }}">警告</span>{% endif %}</td>
+        <td class="mono">{{ it.bytes }}</td>
+        <td><a href="/api/v1/archive/reports/{{ it.report_id }}" target="_blank">元数据</a> · <a href="/api/v1/archive/reports/{{ it.report_id }}/file">下载</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if next_cursor %}
+  <p><button hx-get="/fragments/reports/archive?market={{ market | urlencode }}&symbol={{ symbol | urlencode }}&doc_type={{ doc_type | urlencode }}&cursor={{ next_cursor | urlencode }}"
+             hx-target="#archive-region" hx-swap="outerHTML">下一页</button></p>
+  {% endif %}
+  {% elif not error %}
+  <p class="muted">没有匹配的归档报告(空结果是合法结果)。</p>
+  {% endif %}
+</div>

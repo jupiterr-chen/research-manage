@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}财报原文{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>获取财报原文</h2>
+  {% if not enabled %}
+  <p class="flash-error">未配置 <span class="mono">REPORTS_API_BASE_URL</span>,财报获取功能关闭。配置方法见 docs/REPORTS-FETCHER.md。</p>
+  {% else %}
+  <form hx-post="/fragments/reports/jobs" hx-target="#report-jobs-region" hx-swap="outerHTML" class="form-row">
+    <label>标的
+      <input name="code" list="instrument-codes" value="{{ code_prefill }}" placeholder="1810.HK / 600519.SS / NVDA" required>
+      <datalist id="instrument-codes">
+        {% for i in instruments %}<option value="{{ i.code }}">{{ i.code }} {{ i.name }}</option>{% endfor %}
+      </datalist>
+    </label>
+    <label>最近期数
+      <input type="number" name="last_n" min="1" max="{{ max_last_n }}" value="{{ last_n_default }}" title="最多 N 个逻辑报告组,不等于 N 个财季">
+    </label>
+    <label><input type="checkbox" name="refresh" value="true"> 重新验证/下载(refresh)</label>
+    <button type="submit">提交获取任务</button>
+  </form>
+  <p class="hint">只获取原文与元数据(PDF/HTML),不解析财报。任务提交后由后台线程有界轮询,本页每 15 秒刷新。</p>
+  {% endif %}
+</section>
+
+{% include "fragments/report_jobs.html" %}
+
+<section class="card" id="archive-card">
+  <h2>已归档报告</h2>
+  <form hx-get="/fragments/reports/archive" hx-target="#archive-region" hx-swap="outerHTML" class="form-row">
+    <label>标的代码 <input name="code" placeholder="1810.HK / 600519.SS / NVDA(留空=全部)"></label>
+    <label>市场
+      <select name="market"><option value="">—</option>{% for m in archive_markets %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select>
+    </label>
+    <label>类型 <input name="doc_type" placeholder="10-K / ANNUAL / FY…"></label>
+    <button type="submit">查询</button>
+  </form>
+  <div id="archive-region"><p class="muted">输入条件后查询;结果来自 reports-fetcher 本地档案,不会触发联网抓取。</p></div>
+</section>
+{% endblock %}

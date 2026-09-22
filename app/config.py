@@ -51,6 +51,14 @@ class Settings:
     ta_network: str = ""
     sim_env: str = ""
     tz: str = "Asia/Shanghai"
+    # reports-fetcher 财报原文获取(docs/REPORTS-FETCHER.md);base_url 为空 = 功能关闭
+    reports_base_url: str = ""
+    reports_token: str = ""
+    reports_timeout: float = 30.0  # 单次请求超时(秒)
+    reports_max_wait: float = 900.0  # 单个任务总等待上限(秒)
+    reports_poll_interval: float = 2.0  # 轮询起始间隔(秒),退避至 poll_max
+    reports_poll_max_interval: float = 10.0
+    reports_last_n_default: int = 4
 
     @classmethod
     def load(cls, env: dict[str, str] | None = None) -> Settings:
@@ -65,6 +73,16 @@ class Settings:
                 return int(raw)
             except ValueError:
                 parse_errors.append(f"{name}={raw!r} 不是整数")
+                return default
+
+        def to_float(name: str, default: float) -> float:
+            raw = get(name)
+            if raw is None or raw == "":
+                return default
+            try:
+                return float(raw)
+            except ValueError:
+                parse_errors.append(f"{name}={raw!r} 不是数字")
                 return default
 
         s = cls(
@@ -90,6 +108,13 @@ class Settings:
             ta_network=get("AM_TA_NETWORK", ""),
             sim_env=get("AM_SIM_ENV", ""),
             tz=get("TZ", "Asia/Shanghai"),
+            reports_base_url=get("REPORTS_API_BASE_URL", "").strip(),
+            reports_token=get("REPORTS_API_TOKEN", ""),
+            reports_timeout=to_float("REPORTS_API_TIMEOUT", 30.0),
+            reports_max_wait=to_float("REPORTS_API_MAX_WAIT", 900.0),
+            reports_poll_interval=to_float("REPORTS_API_POLL_INTERVAL", 2.0),
+            reports_poll_max_interval=to_float("REPORTS_API_POLL_MAX_INTERVAL", 10.0),
+            reports_last_n_default=to_int("REPORTS_API_LAST_N_DEFAULT", 4),
         )
         if parse_errors:
             for line in parse_errors:
@@ -129,10 +154,28 @@ class Settings:
         ):
             if val < 1:
                 errors.append(f"{name}={val} 必须 ≥1")
+        if self.reports_base_url and not self.reports_base_url.startswith(("http://", "https://")):
+            errors.append("REPORTS_API_BASE_URL 必须是 http(s):// 地址(不含 /api/v1)")
+        if self.reports_base_url.rstrip("/").endswith("/api/v1"):
+            errors.append("REPORTS_API_BASE_URL 不应包含 /api/v1 前缀")
+        for name, val in (
+            ("REPORTS_API_TIMEOUT", self.reports_timeout),
+            ("REPORTS_API_MAX_WAIT", self.reports_max_wait),
+            ("REPORTS_API_POLL_INTERVAL", self.reports_poll_interval),
+            ("REPORTS_API_POLL_MAX_INTERVAL", self.reports_poll_max_interval),
+        ):
+            if val <= 0:
+                errors.append(f"{name}={val} 必须 >0")
+        if not 1 <= self.reports_last_n_default <= 20:
+            errors.append("REPORTS_API_LAST_N_DEFAULT 必须在 1..20")
         if errors:
             for line in errors:
                 print(f"[config] 校验失败:{line}")
             raise SystemExit(2)
+
+    @property
+    def reports_enabled(self) -> bool:
+        return bool(self.reports_base_url)
 
     def summary(self) -> dict:
         """不含 AM_TOKEN 的生效配置摘要(R-FND-01)。"""
@@ -159,4 +202,9 @@ class Settings:
             "sim_env": self.sim_env or "(无)",
             "tz": self.tz,
             "token": "(已配置)" if self.token else "(未配置,仅限回环绑定)",
+            "reports_base_url": self.reports_base_url or "(未配置,财报获取功能关闭)",
+            "reports_token": "(已配置)" if self.reports_token else "(无)",
+            "reports_timeout": self.reports_timeout,
+            "reports_max_wait": self.reports_max_wait,
+            "reports_poll_interval": self.reports_poll_interval,
         }

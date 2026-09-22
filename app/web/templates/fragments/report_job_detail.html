@@ -1,0 +1,66 @@
+<div id="report-job-region"
+     {% if not job.is_terminal %}hx-get="/fragments/reports/jobs/{{ job.id }}" hx-trigger="every 15s" hx-swap="outerHTML"{% endif %}>
+  {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
+  <section class="card">
+    <h2>{{ job.code }} <span class="muted">({{ job.market }} · 最近 {{ job.last_n }} 期{% if job.refresh %} · refresh{% endif %})</span></h2>
+    <div class="task-grid">
+      <div>状态:<strong>{{ job.status_label }}</strong> <span class="muted mono">{{ job.status }}</span>
+        {% if job.status == 'partial' %}<span class="badge stale">部分完成:可用文件已保留,请查看警告</span>{% endif %}
+      </div>
+      <div class="muted">本地任务 <span class="mono">{{ job.id }}</span> · 服务端任务 <span class="mono">{{ job.remote_job_id or '—' }}</span> · 提交次数 {{ job.submit_attempts }}</div>
+      <div class="muted">创建 {{ job.created_at }} · 开始 {{ job.started_at or '—' }} · 结束 {{ job.finished_at or '—' }}</div>
+      <div class="muted">进度 {{ job.progress_text }}{% if job.summary_text %} · {{ job.summary_text }}{% endif %}</div>
+      {% if job.error %}
+      <div class="flash-error">错误{% if job.error_code %}(<span class="mono">{{ job.error_code }}</span>{% if job.error_retryable %},可重试{% endif %}){% endif %}:{{ job.error }}</div>
+      {% endif %}
+      {% if job.status == 'timeout' and job.remote_job_id %}
+      <div>
+        <button hx-post="/fragments/reports/jobs/{{ job.id }}/refresh" hx-target="#report-job-region" hx-swap="outerHTML">刷新服务端状态</button>
+        <span class="muted">服务端任务可能仍在执行;点击后重新进入轮询。</span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if job.warnings %}
+  <section class="card">
+    <h2>警告({{ job.warnings | length }})</h2>
+    <ul>{% for w in job.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if job.results %}
+  <section class="card">
+    <h2>证券结果</h2>
+    {% for r in job.results %}
+    <div class="sched-table">
+      <p><strong>{{ r.symbol }}</strong> <span class="muted">{{ r.market }}{% if r.display_name %} · {{ r.display_name }}{% endif %}</span>
+        · 状态 <span class="mono">{{ r.status }}</span>
+        {% if r.coverage %}· 覆盖 {{ r.coverage.selected }}/{{ r.coverage.requested }}{% if r.coverage.insufficient_history %} <span class="chip">历史不足</span>{% endif %}{% endif %}
+        {% if r.error %}· <span class="flash-error">{{ r.error.code }}{% if r.error.retryable %}(可重试){% endif %}</span>{% endif %}
+      </p>
+      {% if r.report_ids %}
+      <table>
+        <thead><tr><th>报告 ID</th><th>文件</th><th></th></tr></thead>
+        <tbody>
+          {% for rid in r.report_ids %}
+          {% set item = (r["items"] | selectattr("report_id", "equalto", rid) | list | first) %}
+          <tr>
+            <td class="mono">{{ rid }}</td>
+            <td class="mono">{% if item %}{{ item.status }}{% if item.error %} · {{ item.error }}{% endif %}{% else %}—{% endif %}</td>
+            <td>
+              <a href="/api/v1/archive/reports/{{ rid }}" target="_blank">元数据</a> ·
+              <a href="/api/v1/archive/reports/{{ rid }}/file">下载原文</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% elif r.status == 'no_reports' %}
+      <p class="muted">来源检索完成但没有匹配报告(合法结果)。</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+</div>

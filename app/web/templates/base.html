@@ -13,6 +13,7 @@
     <a class="brand" href="/">Agents-Manage</a>
     <a href="/" {% if request.url.path == '/' %}class="active"{% endif %}>总览</a>
     <a href="/instruments" {% if request.url.path.startswith('/instruments') %}class="active"{% endif %}>标的与调度</a>
+    <a href="/reports" {% if request.url.path.startswith('/reports') %}class="active"{% endif %}>财报原文</a>
     <span class="spacer"></span>
     <span class="lights" title="工作循环 / 队列深度 / docker 可达">
       <span class="light {% if health and health.alive %}ok{% else %}bad{% endif %}" id="light-worker">worker</span>
