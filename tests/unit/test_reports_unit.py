@@ -366,3 +366,38 @@ class TestDisabledFeature:
         disabled_client.headers.pop("Authorization")
         assert disabled_client.get("/api/v1/report-jobs").status_code == 401
         assert disabled_client.get("/reports", follow_redirects=False).status_code == 302
+
+
+class TestReportJobDetailRender:
+    def test_detail_renders_results_without_items(self, settings, disabled_client):
+        """复核清单 2:results 缺 `items`(或为 None)时详情页仍渲染 200。"""
+        conn = connect(settings.db_path)
+        try:
+            job = rj.create(
+                conn, code="NVDA", market=None, last_n=1, refresh=False, trigger="web", actor="web"
+            )
+            rj.mark_submitted(conn, job["id"], remote_job_id="job_x", remote_status="running")
+            rj.finalize_remote(
+                conn,
+                job["id"],
+                {
+                    "status": "partial",
+                    "progress": {"symbols_total": 2, "symbols_finished": 2},
+                    "results": [
+                        {"symbol": "NVDA", "status": "partial", "report_ids": ["r_1"], "warnings": []},
+                        {
+                            "symbol": "MU",
+                            "status": "partial",
+                            "report_ids": ["r_2"],
+                            "items": None,
+                            "warnings": [],
+                        },
+                    ],
+                },
+            )
+            jid = job["id"]
+        finally:
+            conn.close()
+        r = disabled_client.get(f"/reports/jobs/{jid}")
+        assert r.status_code == 200
+        assert "r_1" in r.text and "r_2" in r.text

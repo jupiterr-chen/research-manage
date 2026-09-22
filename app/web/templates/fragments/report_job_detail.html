@@ -44,7 +44,7 @@
         <thead><tr><th>报告 ID</th><th>文件</th><th></th></tr></thead>
         <tbody>
           {% for rid in r.report_ids %}
-          {% set item = (r["items"] | selectattr("report_id", "equalto", rid) | list | first) %}
+          {% set item = ((r.get("items") or []) | selectattr("report_id", "equalto", rid) | list | first) %}
           <tr>
             <td class="mono">{{ rid }}</td>
             <td class="mono">{% if item %}{{ item.status }}{% if item.error %} · {{ item.error }}{% endif %}{% else %}—{% endif %}</td>

@@ -25,6 +25,7 @@
 | M7 Web 页面 | WEB | 3 页 + htmx 片段 + CSS | `feat/web-ui` |
 | M8 部署 | DEP | Dockerfile、compose、部署/回滚文档、NAS 同步脚本 | `feat/deploy` |
 | M9 验收 | ACC | 自动化验收用例、验收记录 | `feat/acceptance` |
+| M10 财报原文获取 | RPT | 对接 reports-fetcher:获取财报原文与元数据、归档查询与下载代理、有界轮询任务 | `feat/reports-fetcher` |
 
 ## 2. 需求条目
 
@@ -144,6 +145,25 @@
 |---|---|---|---|
 | R-ACC-01 | P0 | `tests/acceptance/` 覆盖 [ACCEPTANCE.md](ACCEPTANCE.md) 中标注「自动化」的用例,以 sim 镜像 + 本地 Docker 执行;`pytest -m acceptance` 一键运行 | 全部 |
 | R-ACC-02 | P0 | 验收记录模板 `docs/acceptance-records/<date>.md`:每条 AM 的执行者、环境、结果、证据路径 | — |
+
+### M10 财报原文获取(RPT)
+
+> 只获取**财报原文与元数据**,不解析财报、不提取指标、不做基本面分析。联调契约来自只读套件 `integration-kit/`;生产服务在 NAS。功能与配置见 [REPORTS-FETCHER.md](REPORTS-FETCHER.md)。
+
+| ID | P | 需求 | 验收 |
+|---|---|---|---|
+| R-RPT-01 | P0 | 配置项 `REPORTS_API_*` 唯一来源 `app.config.Settings.load()`(base URL 不含 `/api/v1`);`REPORTS_API_BASE_URL` 为空 = 整条功能关闭:页面提示未配置、轮询线程 no-op、JSON API 返回 503 `reports_disabled` | AM-33 |
+| R-RPT-02 | P0 | 幂等键:本地任务创建时生成并固定 `Idempotency-Key`(`am-<uuid>`);同一任务的所有提交重试复用同键(429 / 连接失败重试不换键) | AM-21/AM-24 |
+| R-RPT-03 | P0 | 有界轮询:每任务独立退避(`poll_interval`→`poll_max_interval`),单次请求超时不超过剩余预算;自 `started_at` 起超过 `max_wait` → `timeout`(可「刷新服务端状态」) | AM-20/AM-29 |
+| R-RPT-04 | P0 | 终态判定:HTTP 200 ≠ 成功,只有服务端 `status ∈ {succeeded, partial, failed}` 才落终态,否则只同步进度 | AM-20/AM-26 |
+| R-RPT-05 | P0 | `partial` 保留可用文件:从 `results[].report_ids` 收集报告并展示 warnings;`failed` 同样保留已产出的报告 | AM-25/AM-32 |
+| R-RPT-06 | P0 | `report_period` 为空(`period_source=unknown`)时页面显示「未知」,不推测报告期 | AM-25 |
+| R-RPT-07 | P0 | 空结果合法:服务端 `succeeded` + 证券 `no_reports` 是合法终态,页面提示「来源检索完成但没有匹配报告」 | AM-27/AM-32 |
+| R-RPT-08 | P0 | 归档:分页(cursor,无重复)、详情、后端代理下载;下载校验 sha256 与 ETag,浏览器 `If-None-Match` 命中 → 304 | AM-19/AM-30 |
+| R-RPT-09 | P0 | 上游 `application/problem+json` 统一映射:409 `idempotency_conflict` 落 `error`;429 / 可重试错误按 `Retry-After` 保持 `pending` 重试;未知 ID → 404 | AM-22/AM-23/AM-24/AM-28 |
+| R-RPT-10 | P0 | 同标的互斥:同 (market, code) 存在 `pending/queued/running` 任务时 `create` 返回 409 且零副作用;不同标的可并行 | AM-19 |
+| R-RPT-11 | P0 | 审计:任务创建、终态(finalize,含状态/报告数/warnings/error_code)、刷新各一条 `audit_log` | AM-19/AM-32 |
+| R-RPT-12 | P0 | 令牌不下发前端:`REPORTS_API_TOKEN` 仅存在于管理台进程,归档/下载经后端代理;业务代码不含任何 mock 控制项(`X-Mock-Scenario` / `/__mock/*`) | AM-31 |
 
 ## 3. 非功能需求
 

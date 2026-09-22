@@ -95,12 +95,13 @@ def _job_view(job: dict) -> dict:
 def _page_ctx(db, request: Request, *, message=None, error=None, code_prefill: str = "") -> dict:
     settings = request.app.state.settings
     poller = getattr(request.app.state, "reports_poller", None)
+    jobs = rj_srv.list_jobs(db, limit=50)
     return {
         "enabled": settings.reports_enabled,
         "reports_health": poller.health() if poller else {"enabled": False, "alive": False},
         "instruments": inst_srv.list_instruments(db) if hasattr(inst_srv, "list_instruments") else [],
-        "jobs": [_job_view(j) for j in rj_srv.list_jobs(db, limit=50)],
-        "has_active": any(j["status"] in rj_srv.ACTIVE for j in rj_srv.list_jobs(db, limit=50)),
+        "jobs": [_job_view(j) for j in jobs],
+        "has_active": any(j["status"] in rj_srv.ACTIVE for j in jobs),
         "last_n_default": settings.reports_last_n_default,
         "max_last_n": rj_srv.MAX_LAST_N,
         "message": message,
