@@ -27,3 +27,5 @@ dist/
 *.swp
 .DS_Store
 Thumbs.db
+
+.orchestra/runs/
