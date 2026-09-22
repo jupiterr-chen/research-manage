@@ -13,7 +13,7 @@
 | S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
 | S8 | feat/acceptance | done | a66f444 | 86ec931 (merge) | 2026-09-15 用户确认;AM-05 审计留痕偏差经用户决定忽略 |
 | S9 | 移交(tag v1.0.0-rc1) | done | 49e160d | tag v1.0.0-rc1 | 2026-09-15 开发阶段完成,移交 P3 |
-| S10 | feat/reports-fetcher | awaiting_confirmation | (见 git) | | 2026-09-22 主体由验收方实现;收尾经 .orchestra 派给 opencode/deepseek-v4.1-flash:T-0001(部署配置+接入文档)、T-0002(需求/验收/契约文档+复核小修),均一轮验收通过 |
+| S10 | feat/reports-fetcher | done | 7c42d70 | develop 6d0… / release 7711072 | 2026-09-22 主体由验收方实现;收尾经 .orchestra 派给 opencode/deepseek-v4.1-flash:T-0001(部署配置+接入文档)、T-0002(需求/验收/契约文档+复核小修),均一轮验收通过 |
 
 ## 汇报摘要(每步一条,最新在上)
 
