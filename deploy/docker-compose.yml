@@ -1,6 +1,7 @@
 # 生产 compose(NAS /home/chen/docker/agents-manage/,SPEC §9 / R-DEP-02)
 # 用法:在同步目录根部执行 docker compose -f deploy/docker-compose.yml up -d
 # 挂载源均为宿主路径;./…、../… 相对本文件所在目录(deploy/)。
+name: agents-manage   # compose 项目名(否则默认取目录名 deploy;T-04)
 services:
   agents-manage:
     build:
@@ -33,7 +34,7 @@ services:
       - AM_RETENTION_DAYS=90
       - TZ=Asia/Shanghai
     ports:
-      - "8090:8090"
+      - "192.168.1.150:8090:8090"   # 只发布在 LAN 网卡(SPEC §8;T-02)
     healthcheck:
       # /healthz 需鉴权;容器内环境变量可取 token,docker inspect 本就可见 AM_TOKEN(SPEC §9 设计)
       test: ["CMD", "python", "-c", "import os,urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8090/healthz', headers={'Authorization': 'Bearer ' + os.environ['AM_TOKEN']}), timeout=5)"]

@@ -14,12 +14,26 @@ from app import models
 
 _SENSITIVE_KEY = re.compile(r"key|token|secret|password|authorization", re.IGNORECASE)
 _SK_PATTERN = re.compile(r"sk-[A-Za-z0-9]{8,}")
+# URL 查询串 / 键值对形式的凭据(T-07:上游把 FRED 等请求 URL 连同 api_key= 写进日志)
+_KV_PATTERN = re.compile(
+    r"(?i)\b(api[_-]?key|apikey|access[_-]?token|auth[_-]?token|token|secret|password|passwd|authorization)"
+    r"([\"']?\s*[=:]\s*)(?!bearer\b|\*\*\*)([\"']?[^&\s\"'<>]+[\"']?)"
+)
+_BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}")
 _MASK = "***"
+
+
+def scrub_text(text: str) -> str:
+    """字符串脱敏:sk-*、`key=value` / `key: value` 形式、`Bearer xxx`。"""
+    text = _SK_PATTERN.sub("sk-***", text)
+    text = _BEARER_PATTERN.sub("Bearer ***", text)  # 先于 KV,避免 "Authorization: Bearer" 被当成值
+    text = _KV_PATTERN.sub(lambda m: f"{m.group(1)}{m.group(2)}{_MASK}", text)
+    return text
 
 
 def scrub(obj: Any) -> Any:
     """递归脱敏:键名匹配 /key|token|secret|password|authorization/i 的值 → "***";
-    字符串中的 sk-[A-Za-z0-9]{8,} → "sk-***"。返回脱敏后的新对象。"""
+    字符串经 scrub_text()(sk-*、URL/键值对里的 api_key=…、Bearer …)。返回脱敏后的新对象。"""
     if isinstance(obj, dict):
         out: dict[str, Any] = {}
         for k, v in obj.items():
@@ -31,7 +45,7 @@ def scrub(obj: Any) -> Any:
     if isinstance(obj, (list, tuple)):
         return [scrub(x) for x in obj]
     if isinstance(obj, str):
-        return _SK_PATTERN.sub("sk-***", obj)
+        return scrub_text(obj)
     return obj
 
 

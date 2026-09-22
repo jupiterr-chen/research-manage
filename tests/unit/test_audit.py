@@ -74,3 +74,24 @@ class TestAudit:
     def test_bad_actor(self, conn):
         with pytest.raises(ValueError):
             audit.audit(conn, "hacker", "x", "y", None, None)
+
+
+def test_scrub_masks_secrets_embedded_in_urls_and_headers():
+    """T-07:上游日志把请求 URL 连同 api_key= 写进 container.log,scrub 必须遮蔽。"""
+    from app.audit import scrub, scrub_text
+
+    line = (
+        "Vendor 'fred' failed: 502 for url: https://api.stlouisfed.org/fred/series"
+        "?series_id=DGS2&realtime_start=2026-09-15&api_key=9473ea72329e18bed8c271abcdef&file_type=json"
+    )
+    out = scrub_text(line)
+    assert "9473ea72329e18bed8c271abcdef" not in out
+    assert "api_key=***&file_type=json" in out
+    assert "series_id=DGS2" in out  # 非敏感参数保留
+
+    assert scrub_text("Authorization: Bearer abcDEF123456789.xyz") == "Authorization: Bearer ***"
+    assert scrub_text("token: hunter2secret") == "token: ***"
+    assert scrub_text('{"access_token": "abc123456"}') == '{"access_token": ***}'  # 引号内也遮蔽
+    assert scrub({"msg": "x?apikey=QWERTY123"})["msg"] == "x?apikey=***"
+    # 普通文本不受影响
+    assert scrub_text("Market Analyst done, tokens=2130") == "Market Analyst done, tokens=2130"
