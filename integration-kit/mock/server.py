@@ -25,7 +25,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 HERE = Path(__file__).resolve().parent
 KIT_ROOT = HERE.parent
@@ -543,6 +543,27 @@ def submit_job(state: MockState, client_id: str, key: str, body: dict,
 # Reports
 # --------------------------------------------------------------------------- #
 
+def _download_filename(report: dict, artifact: dict) -> str:
+    """Readable, deterministic attachment name mirroring the real service.
+
+    ``market_symbol_doc_type_<period|filing|unknown>_report_id.ext``; a
+    historical (non-current) artifact appends its artifact_id. ASCII fallback
+    plus RFC 6266 ``filename*`` UTF-8 are both provided.
+    """
+    period_token = report["report_period"] or report["filing_date"] or "unknown"
+    parts = [report["market"], report["symbol"], report["doc_type"],
+             period_token, report["report_id"]]
+    base = "_".join(re.sub(r"[^A-Za-z0-9._-]+", "-", str(p)).strip("-._") or
+                    "unknown" for p in parts)
+    if artifact["artifact_id"] != report["current_artifact_id"]:
+        base = f"{base}_{artifact['artifact_id']}"
+    ext = "pdf" if artifact["media_type"] == "application/pdf" else "html"
+    name = f"{base}.{ext}"
+    ascii_name = re.sub(r"[^\x20-\x7e]", "_", name) or "report"
+    return (f"attachment; filename=\"{ascii_name}\"; "
+            f"filename*=UTF-8''{quote(name)}")
+
+
 def _report_list_item(report: dict) -> dict:
     artifact = report["artifact"]
     return {
@@ -1019,12 +1040,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("If-None-Match") == etag:
             return Resp(304, b"", None, {"ETag": etag})
         ext = "pdf" if artifact["media_type"] == "application/pdf" else "html"
-        filename = f"{report_id}.{ext}"
+        filename = _download_filename(report, artifact)
         return Resp(200, artifact["content"], artifact["media_type"], {
             "ETag": etag,
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition":
-                f'attachment; filename="{filename}"',
+            "Content-Disposition": filename,
         })
 
     # -- mock control ------------------------------------------------------ #

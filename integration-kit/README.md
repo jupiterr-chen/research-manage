@@ -121,6 +121,15 @@ docker compose -f integration-kit/compose.yaml stop
 - **coverage 字段对齐权威实现**：使用 `requested/selected/total_groups/exhausted/
   truncated/searched_from/searched_to/insufficient_history/notices`；mock 不进行
   真实检索窗口，故 `searched_from/searched_to` 恒为 `null`（已文档化）。
+- **progress 契约**：`symbols_total` 为规范化去重后的提交代码数（queued 起即正确，
+  单代码运行中为 1），`symbols_finished` 为已持久化结果数（运行中未出结果为 0）。
+- **文件响应头对齐**：`Content-Disposition` 使用可读确定名
+  `{market}_{symbol}_{doc_type}_{报告期|公告日|unknown}_{report_id}.{ext}` 并带
+  `filename*=UTF-8''`；历史版本追 artifact_id。mock 只保留单一 artifact，
+  历史版本命名分支不在此演示。
+- **period_source**：权威取值为 `source_field | explicit_title | document | unknown`；
+  mock 只产生 `source_field`/`explicit_title`/`unknown`（不解析 PDF 原文，故不产生
+  `document`；该值仅在真实服务的 HK 归档后富化出现）。
 - **可选鉴权（简化）**：设 `MOCK_API_TOKEN` 后 `/api/v1/*` 需要
   `Authorization: Bearer <token>`（默认不启用，即本地无鉴权模式）。
 - 因此：mock 用于验证**客户端行为**（轮询、幂等、错误处理、文件字节与校验），

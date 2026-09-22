@@ -142,6 +142,14 @@ Content-Type: application/json
 - `items[].status`：`downloaded | cached | failed`（文件级结果）。
 - `summary` 统计文件处理结果；证券级 resolve/list 失败另见 `results`，
   因此文件失败数不必然等于证券失败数。
+- `progress.symbols_total` 是提交时规范化去重后的代码数，**从 queued 起即正确**
+  （不依赖已持久化结果）；`progress.symbols_finished` 只统计已持久化的证券结果。
+  单代码任务在 queued/running 且尚无结果时返回 `{"symbols_total":1,
+  "symbols_finished":0}`，终态时 finished 等于实际产出的证券结果数。
+- 质量 `warnings` 只针对选中且产出可用文件的报告；未选入 `last_n` 的候选
+  报告期未知等信息在 `coverage.notices` 聚合至多一次，不逐条进入 `warnings`。
+  若 HK 归档 PDF 能在抓取后提取明确期末日，`period_source` 会是 `document`
+  且不再给出未知期警告（见 `report_period`/`period_source` 枚举）。
 - `coverage` 为开放字典，权威字段名（v1.0.1 `core.py`）为
   `requested / selected / total_groups / exhausted / truncated /
   searched_from / searched_to / insufficient_history / notices`；
@@ -149,6 +157,8 @@ Content-Type: application/json
   （不进行真实检索窗口），属于已文档化的简化，见 README §6。
 - `report_period` 可能为 `null`（未知即 null，禁止猜测），此时
   `period_source="unknown"` 且 `warnings` 给出说明；**这类报告仍可能有可用文件**。
+  `period_source` 取值：`source_field | explicit_title | document | unknown`；
+  `filing_date` 只作文件名回退，绝不作报告期来源。
 
 ## 5. 档案查询
 
@@ -193,8 +203,13 @@ Content-Type: application/json
 
 - 返回**真实文件字节**，不是 JSON。`?artifact_id=<id>` 可下载历史版本。
 - 响应头：`Content-Type`（`application/pdf` 或 `text/html`）、`Content-Length`、
-  `Content-Disposition: attachment; filename="..."`、
-  `X-Content-Type-Options: nosniff`、`ETag`（带引号的 SHA-256）。
+  `X-Content-Type-Options: nosniff`、`ETag`（带引号的 SHA-256），以及
+  `Content-Disposition: attachment; filename="..."`。
+- 文件名可读且确定：`{market}_{symbol}_{doc_type}_{报告期|公告日|unknown}_{report_id}.{ext}`
+  （例如 `US_AAPL_10-Q_2026-06-30_<report_id>.html`）；同时携带
+  `filename*=UTF-8''`。报告期未知才用公告日，二者都无则 `unknown`；历史版本
+  （非当前 artifact）追加 artifact_id 以避免歧义。**不要依赖固定旧格式**，
+  一律以响应头为准。
 - **条件请求**：带上一次响应的 `If-None-Match: "<sha256>"`，命中返回 **304**
   （无 body，仅 `ETag`）。
 - 未知报告/未知 artifact/artifact 不属于该报告：404 `not_found`。
