@@ -36,7 +36,7 @@ research-manage/
 │   │   ├── verdict.py         # 终态判定
 │   │   └── retention.py
 │   ├── scheduler.py           # APScheduler 封装
-│   └── web/
+│   ├── web/
 │       ├── server.py          # create_app()、lifespan、异常边界
 │       ├── auth.py            # token/cookie/限速
 │       ├── deps.py            # 依赖注入(db、settings、current_actor)
@@ -46,11 +46,16 @@ research-manage/
 │       │   └── api_runs.py    # /api/v1/runs*
 │       ├── templates/         # base.html + 页面 + fragments/
 │       └── static/            # htmx.min.js、app.css
+│   └── reports/               # reports-fetcher 财报原文对接(只读原文与元数据)
+│       ├── client.py          # 标准库 HTTP 客户端(幂等键、有界轮询、sha256/ETag)
+│       ├── poller.py          # 轮询线程(独立于 docker Worker)
+│       └── symbols.py         # 本系统代码 ↔ reports-fetcher 证券代码映射
 ├── runner/
 │   └── runner.py              # 执行容器内脚本(仅标准库 + tradingagents)
 ├── sim/                       # 本地仿真镜像
 │   ├── Dockerfile
 │   └── tradingagents/         # 假包,与真实 API 表面一致
+├── integration-kit/           # reports-fetcher 本地联调套件(只读契约,不得修改)
 ├── deploy/
 │   ├── Dockerfile
 │   ├── docker-compose.yml
@@ -110,6 +115,13 @@ uvicorn 主进程(单 worker)
 | `AM_TA_NETWORK` | 空 | 执行容器加入的 docker 网络;空 = 默认 bridge。本地开发填 compose 网络名,使执行容器能解析 `llm-stub` |
 | `AM_SIM_ENV` | 空 | **仅本地开发**:附加给执行容器的 env(如 `SIM_MODE=fail`),生产 MUST 为空 |
 | `TZ` | `Asia/Shanghai` | |
+| `REPORTS_API_BASE_URL` | 空 | reports-fetcher base URL(**不含 `/api/v1`**);空 = 财报获取功能关闭(docs/REPORTS-FETCHER.md) |
+| `REPORTS_API_TOKEN` | 空 | 可选 Bearer token;只存在于管理台进程,不下发前端 |
+| `REPORTS_API_TIMEOUT` | `30` | 单次请求超时(秒) |
+| `REPORTS_API_MAX_WAIT` | `900` | 单任务总等待预算(秒),超出置 `timeout` |
+| `REPORTS_API_POLL_INTERVAL` | `2` | 轮询起始间隔(秒) |
+| `REPORTS_API_POLL_MAX_INTERVAL` | `10` | 轮询最大间隔(秒) |
+| `REPORTS_API_LAST_N_DEFAULT` | `4` | 页面默认最近期数(1..20) |
 
 `Settings.load()` 顺序:读 env → 类型转换 → `validate()`(绑定门禁、必填、数值范围)→ 失败 `SystemExit(2)` 并打印原因。`Settings.summary()` 返回不含 `AM_TOKEN` 的 dict 供启动日志。
 

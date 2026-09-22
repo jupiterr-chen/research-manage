@@ -1,0 +1,21 @@
+{
+  "engine": "opencode",
+  "model": "opencode-go/deepseek-v4.1-flash",
+  "agent": "build",
+  "autoApprove": true,
+  "verify": "./.venv/Scripts/pytest.exe tests/unit -q && ./.venv/Scripts/ruff.exe check . && ./.venv/Scripts/ruff.exe format --check .",
+  "checkIntervalSec": 120,
+  "zhome": "",
+  "protectedBranches": [
+    "main",
+    "develop",
+    "release/v1.0"
+  ],
+  "_notes": [
+    "仓库真名 research-manage（GitHub jupiterr-chen/research-manage），目录名 Agents-Manage。外层 researcher-agent/ 不是 git 仓库，是研报 Markdown 工作区，orchestra 不装在那。",
+    "模型是沿用 stocks-alert 的默认，你没为这个仓库单独指定；preflight 时会打出来让你确认。",
+    "CLAUDE.md 12 条红线 + docs/AGENT-PLAYBOOK.md 的自驱协议是权威，AGENTS.md 只是入口。红线 1：NAS 上的 TradingAgents 是共享生产依赖，只读、不重启、不重建。",
+    "verify 默认只跑 tests/unit（快）。-m docker / -m acceptance 需要本地 Docker + tradingagents-sim:latest 镜像，任务卡涉及时再在卡里指定。项目没装 mypy。",
+    "分支：feat/* 从 develop 切出，PR 回 develop。派发前先 git switch -c feat/<模块> 或 fix/<T-ID>。"
+  ]
+}

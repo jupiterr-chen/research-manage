@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}财报任务 {{ job.id }}{% endblock %}
+{% block content %}
+<p><a href="/reports">← 财报原文</a></p>
+{% include "fragments/report_job_detail.html" %}
+{% endblock %}

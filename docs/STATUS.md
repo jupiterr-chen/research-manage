@@ -13,8 +13,23 @@
 | S7 | feat/deploy | done | 9d9fca3 | db949e7 (merge) | 2026-09-15 用户确认 |
 | S8 | feat/acceptance | done | a66f444 | 86ec931 (merge) | 2026-09-15 用户确认;AM-05 审计留痕偏差经用户决定忽略 |
 | S9 | 移交(tag v1.0.0-rc1) | done | 49e160d | tag v1.0.0-rc1 | 2026-09-15 开发阶段完成,移交 P3 |
+| S10 | feat/reports-fetcher | awaiting_confirmation | (见 git) | | 2026-09-22 主体由验收方实现;收尾经 .orchestra 派给 opencode/deepseek-v4.1-flash:T-0001(部署配置+接入文档)、T-0002(需求/验收/契约文档+复核小修),均一轮验收通过 |
 
 ## 汇报摘要(每步一条,最新在上)
+
+### S10 feat/reports-fetcher — awaiting_confirmation(2026-09-22)
+
+- T-0001(opencode,8.5 分钟):deploy/.env.example、两个 compose(REPORTS_API_* + extra_hosts + reports-mock 服务)、docs/REPORTS-FETCHER.md(8 节)、DEPLOY/DESIGN/README。执行方正确指出 ruff 全仓库因 integration-kit 失败 → 指挥方把 integration-kit 加入 ruff exclude。
+- T-0002(opencode):REQUIREMENTS M10 R-RPT-01~12;ACCEPTANCE AM-19~33(逐条对应集成测试函数)+ NAS 第 10 步;SPEC 附 B v1.2;复核清单 6 条(2 处代码修复:`_page_ctx` 单次查询、模板 `r.get("items")` —— 执行方指出任务卡建议的 `r["items"] or []` 在 Jinja 下会取到 dict.items 方法,已实测,写法正确)。
+- 验收:`task.ps1 verify` unit 386 + ruff 全绿;`-m reports_mock` 19 全绿;套件基线 31 OK。
+- 待用户确认:合入 develop;是否同步 release/v1.0 并在 NAS 启用(需设 REPORTS_API_BASE_URL,属生产变更)。
+
+### (交接时的记录)
+
+- 已在分支:`app/reports/`(client/symbols/poller)、`app/services/report_jobs.py`、`app/web/routes/reports.py`、
+  模板 4 个、`report_job` 表、`REPORTS_API_*` 配置、`integration-kit/` 只读副本。
+- 测试:unit 23 + 对真实 mock 集成 19(`-m reports_mock`)全绿;套件基线 31 OK;ruff 零告警。
+- 待办见 AGENT-PLAYBOOK §2 S10「你要做的」。
 
 ### S9 移交 — done(2026-09-15)
 

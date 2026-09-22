@@ -11,7 +11,7 @@
 
 在内网 NAS 上部署一个 Web 管理台:可视化配置"市场-标的"的研究调度(定时/手动),驱动 NAS 上已部署的 **TradingAgents** 多智能体分析框架执行,跟踪执行进度与状态,展示"报告是否已生成"。**纯任务管理台:不渲染任何报告内容,不涉及交易。**
 
-明确不做(OUT OF SCOPE):报告内容展示(报告走 SMB 网络驱动器直接看原文件)、回测、实盘信号、多用户体系、移动端适配、WebSocket/SSE 推送、通知推送(v1 纯轮询)、**TradingAgents 自身的部署/升级/补丁/模型配置(由其自身运维体系负责,本系统只依赖 §1 列出的契约)**。
+明确不做(OUT OF SCOPE):报告内容展示(报告走 SMB 网络驱动器直接看原文件)、**财报内容解析/指标提取**、回测、实盘信号、多用户体系、移动端适配、WebSocket/SSE 推送、通知推送(v1 纯轮询)、**TradingAgents 自身的部署/升级/补丁/模型配置(由其自身运维体系负责,本系统只依赖 §1 列出的契约)**。
 
 ## 1. 依赖的既有环境与契约(实现前必读)
 
@@ -353,3 +353,11 @@ services:
 - run 表新增 `cancel_requested_at`:Web/API 不直接调 docker,取消由工作线程执行
 - 精简:v1 JSON API 收敛为 runs;删除 `schedule.kind=manual_only`;`/run` 页并入总览(4 页→3 页);crypto 市场移至 v2
 - 移除 v1.0 中 TradingAgents 侧的部署/补丁/端点/问题史内容(不属本系统范围)
+
+**v1.2(2026-09-22)** —— reports-fetcher 财报原文获取接入(分支 `feat/reports-fetcher`;功能与配置见 [docs/REPORTS-FETCHER.md](docs/REPORTS-FETCHER.md)):
+- 新增 `report_job` 表(本地任务跟踪,状态机 pending/queued/running/succeeded/partial/failed/timeout/error;DDL 见 `app/db.py`),SQLite 仍为唯一事实源
+- 新增配置 `REPORTS_API_BASE_URL/TOKEN/TIMEOUT/MAX_WAIT/POLL_INTERVAL/POLL_MAX_INTERVAL/LAST_N_DEFAULT`(唯一来源 `app/config.py`);`REPORTS_API_BASE_URL` 为空时整条功能关闭
+- 新增页面 `/reports`、`/reports/jobs/{id}` 与 htmx 片段 `/fragments/reports/*`(15s 轮询);JSON API `/api/v1/report-jobs*`;归档只读代理 `/api/v1/archive/reports*`(后端代理下载,令牌不下发前端)
+- 新增轮询线程 `ReportsPoller`,独立于 docker Worker;出站请求忽略系统代理
+- `integration-kit/` 为 reports-fetcher 契约(v1.0.1)的**只读副本**,不得修改以迁就客户端
+- 与 v1 约束的关系:不违反约束 1(SQLite 唯一事实源)、约束 2(无构建步骤/无外链)、约束 3(执行逻辑不在 Web 层:HTTP 由独立轮询线程执行)、约束 7(凭据零接触:`REPORTS_API_TOKEN` 只存在于管理台进程,不读 `.env`);HTTP 200 ≠ 成功,只有服务端 `status ∈ {succeeded, partial, failed}` 才落终态

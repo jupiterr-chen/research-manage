@@ -1,6 +1,6 @@
 # 验收手册(Acceptance Manual)
 
-> 对应 [SPEC.md §10](../SPEC.md) 的 AM-01~18。每条给出:环境、是否自动化、前置、步骤、预期、证据。
+> 对应 [SPEC.md §10](../SPEC.md) 的 AM-01~18;AM-19~33 为 v1.2 财报原文获取(SPEC 附 B v1.2,本文件为唯一清单)。每条给出:环境、是否自动化、前置、步骤、预期、证据。
 > **环境**:`LOCAL` = 本地 Docker + `tradingagents-sim:latest`;`NAS` = 192.168.1.150 真实镜像(受 [NAS-ACCESS.md](NAS-ACCESS.md) 约束,真实运行需用户确认)。
 > **判定**:🔴 项任一 FAIL → 不可上线。非 🔴 项 FAIL → 记录为已知缺陷,由用户决定是否放行。
 > **记录**:执行结果写入 `docs/acceptance-records/<YYYY-MM-DD>-<local|nas>.md`(模板见 §3)。
@@ -155,6 +155,125 @@ grep -r "FAKEKEY" .local/am-data/ app.log || echo "clean"
 - 预期:`runs/<id>/container.log` 存在且含 sim 的异常栈;详情页只显示该文件**路径**;`GET /api/v1/runs/{id}` 不含日志内容
 - 证据:`ls`、页面截图、响应体
 
+### AM-19 🔴 财报获取 happy path:提交→进度→终态→归档→下载→304
+- 环境 LOCAL(Docker + `integration-kit` mock)· 自动化 ✅
+- 前置:`docker compose -f integration-kit/compose.yaml up -d mock`(127.0.0.1:18765);默认(success)场景;管理台 `REPORTS_API_BASE_URL=http://127.0.0.1:18765`
+- 步骤:① `POST /api/v1/report-jobs {code:"700.hk",last_n:2}` ② 轮询任务至终态 ③ 同标的再次发起 ④ `GET /api/v1/archive/reports?code=0700.HK` ⑤ `GET /api/v1/archive/reports/{rid}` ⑥ `GET .../file` 核对 `X-Checksum-SHA256`/`ETag`/sha256 ⑦ 带 `If-None-Match` 重下
+- 预期:① 202 status=pending、symbol=`0700.HK`、instrument_id 已绑定 ② succeeded、remote_job_id 非空、report_ids 2 份、submit_attempts=1 ③ 第二次 409(同标的互斥,零副作用) ④ 归档含这些 report_ids ⑤ 详情含 `artifacts[].sha256` ⑥ 200 且 sha256 一致、`ETag`=`"<sha256>"`、Content-Disposition attachment ⑦ 304、无 body
+- 测试:`tests/integration/test_reports_mock.py::TestAppEndToEnd::test_submit_progress_terminal_archive_download`、`TestClientContract::test_happy_path_submit_poll_list_detail_download_checksum`、`TestClientContract::test_health`
+- 证据:响应体、任务行与审计、下载响应头
+
+### AM-20 进度序列(queued/running→终态)
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达;slow 场景
+- 步骤:提交 `MSFT`,`wait_for_terminal(on_poll=记录每次状态)`
+- 预期:去重后的状态序列首项 ∈ {queued,running}、末项 ∈ {succeeded,partial,failed};至少出现一次 queued 或 running
+- 测试:`TestClientContract::test_progression_queued_running_terminal`
+- 证据:状态序列
+
+### AM-21 幂等重放(同键 202/202→200)
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达;slow 场景
+- 步骤:同一 `Idempotency-Key` 连续提交两次 → 等终态 → 再提交一次;另用新 key 分别以「省略 last_n/refresh」与「显式 last_n=4,refresh=false」提交
+- 预期:两次提交均 202 且 job_id 相同;终态后重放 200 且 job_id 相同;省略默认值与显式默认值视为同一请求(job_id 相同)
+- 测试:`TestClientContract::test_idempotent_replay_same_job_pending_202_then_terminal_200`
+- 证据:响应状态与 job_id
+
+### AM-22 409 idempotency_conflict
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达
+- 步骤:同一 key 先以 `last_n=1` 提交,再以 `last_n=2` 提交;管理台侧同键冲突由轮询线程映射
+- 预期:第二次 409、code=`idempotency_conflict`、不可重试;管理台侧该错误落 `error`(不可重试)
+- 测试:`TestClientContract::test_idempotency_conflict_409`;本地映射见 `tests/unit/test_reports_unit.py::TestPoller::test_conflict_and_validation_are_terminal_errors`
+- 证据:problem+json、任务行
+
+### AM-23 参数错误矩阵
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达
+- 步骤:客户端侧:空 key / 超长 key / 空 symbols / `last_n=21` / 未知字段 / 缺 key / 非法 key / `text/plain` / 非法 JSON;应用侧:`code="ABC;rm"`、`last_n=21`、`last_n=0`、归档 `code=bad;`、未知 job id、页面片段非法 code
+- 预期:客户端侧 ValueError 或 problem+json(422 `invalid_request`、400 `missing_idempotency_key`、400 `invalid_idempotency_key`、415 `unsupported_media_type`);应用侧 400 `invalid_request`、404 `not_found`;页面片段内联 `flash-error`
+- 测试:`TestClientContract::test_validation_errors_problem_json`、`TestAppEndToEnd::test_invalid_params_400`
+- 证据:响应体
+
+### AM-24 queue_full 429 + Retry-After(管理台同键重试)
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 场景 queue_full
+- 步骤:客户端提交观察 429 与 `Retry-After`;应用侧以 queue_full 起任务,待 `submit_attempts≥1` 后切正常 client 并清 `next_attempt_at`,等终态;对照前后 `idempotency_key`
+- 预期:客户端 `ProblemError` status=429、code=`queue_full`、`retry_after>0`;应用任务保持 pending、`submit_attempts≥1`、error 以 queue_full 开头;恢复后 succeeded、`submit_attempts≥2`,前后 idempotency_key 相同
+- 测试:`TestClientContract::test_queue_full_429_retry_after`、`TestAppEndToEnd::test_queue_full_then_recovers_with_same_key`
+- 证据:响应、任务行
+
+### AM-25 partial 保留可用文件 + report_period=null 不推测
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 场景 partial
+- 步骤:提交 `0700.HK` `last_n=2`;取终态;逐个 `get_report` 并下载
+- 预期:任务 status=partial 且有 report_ids 与 warnings;`results[0].status=partial`;至少一个报告 `report_period is None` 且 `period_source=unknown`;每个可用文件仍可下载并通过 sha256 校验
+- 测试:`TestClientContract::test_partial_keeps_usable_files_and_unknown_period`
+- 证据:终态文档、报告详情、下载
+
+### AM-26 failed 是 HTTP 200 + 可重试 error
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 场景 failed
+- 步骤:提交 `600519`;取终态;再原始 `GET /api/v1/fetch-jobs/{id}`
+- 预期:HTTP 200 且 status=failed;`results[0].status=failed`、report_ids=[];`error.code=source_unavailable`、`retryable=true`
+- 测试:`TestClientContract::test_failed_job_is_http_200_with_retryable_error`
+- 证据:响应
+
+### AM-27 no_reports 空结果合法
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 场景 no_reports
+- 步骤:提交 `AAPL`;取终态
+- 预期:任务 status=succeeded、`results[0].status=no_reports`、report_ids=[];warnings 含 `no_matching_reports`
+- 测试:`TestClientContract::test_no_reports_is_success_with_empty_result`
+- 证据:终态文档
+
+### AM-28 未知 ID → 404
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达
+- 步骤:`get_job("job_nope")`、`get_report("r_nope")`、下载未知报告;对真实报告传不属于它的 `artifact_id`
+- 预期:均 404、code=`not_found`(artifact 不属于该报告同样 404);应用侧归档代理透传 404
+- 测试:`TestClientContract::test_unknown_ids_404`;应用侧透传见 `TestAppEndToEnd::test_submit_progress_terminal_archive_download`
+- 证据:problem+json
+
+### AM-29 有界超时 + 刷新
+- 环境 LOCAL · 自动化 ✅
+- 前置:slow 场景;缩短等待预算
+- 步骤:客户端以 `max_wait=1.5` 跑 slow 观察 `WaitTimeout`;应用侧 `reports_max_wait=1.5` 起任务至 timeout,再恢复预算并 `POST /api/v1/report-jobs/{id}/refresh`
+- 预期:客户端 ≤4s 抛 `WaitTimeout`,last_document.status ∈ {queued,running};应用任务 timeout、error_code=`wait_timeout`、保留 remote_job_id;页面出现「刷新服务端状态」;refresh 后 running,再至 succeeded
+- 测试:`TestClientContract::test_bounded_timeout_on_slow`、`TestAppEndToEnd::test_bounded_timeout_then_refresh`
+- 证据:异常、任务行、页面
+
+### AM-30 归档分页 cursor 无重复
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达
+- 步骤:提交 `TSLA` `last_n=5` 等终态;`limit=2` 逐页翻到 `next_cursor` 为空;再以 `cursor=garbage` 查询
+- 预期:各页 report_id 无重复、累计 ≥5、页数 ≥3;非法 cursor → 400 `invalid_cursor`
+- 测试:`TestClientContract::test_pagination_cursor_no_duplicates`
+- 证据:各页 report_id
+
+### AM-31 业务代码无 mock 控制项
+- 环境 LOCAL · 自动化 ✅
+- 步骤:构造生产 client 断言 `default_headers` 无场景头;AST 扫描 `app/**/*.py` 的字符串常量
+- 预期:无 `X-Mock-Scenario` / `/__mock/` 常量(仅 docstring 说明性提及不算)
+- 测试:`TestClientContract::test_no_mock_headers_in_production_client`
+- 证据:pytest 输出
+
+### AM-32 应用侧 partial/failed/no_reports 端到端(页面文案 + 审计)
+- 环境 LOCAL · 自动化 ✅
+- 前置:mock 可达
+- 步骤:分别以 partial(`NVDA`)、failed(`600519.SS`)、no_reports(`MU`)经应用发起,等终态,核对页面与审计
+- 预期:状态与 report_ids 符合场景;partial 页面含「部分完成」与「下载原文」;failed `error_code=source_unavailable`、`error_retryable=true`;no_reports `results[0].status=no_reports`;审计含 create+finalize
+- 测试:`TestAppEndToEnd::test_partial_and_failed_and_no_reports_via_app`
+- 证据:响应、页面、审计
+
+### AM-33 功能关闭态 + 未鉴权
+- 环境 LOCAL · 自动化 ✅
+- 前置:不配 `REPORTS_API_BASE_URL`(默认关闭)
+- 步骤:`GET /reports`;`POST /api/v1/report-jobs`;`GET /api/v1/archive/reports`;`GET /healthz`;去掉 `Authorization` 再访问
+- 预期:`/reports` 200 且提示 `REPORTS_API_BASE_URL`;两个 API 返回 503 `reports_disabled`;`/healthz` 的 `reports.enabled=false`;未鉴权时 API 401、页面 302 跳 `/login`
+- 测试:`tests/unit/test_reports_unit.py::TestDisabledFeature::test_page_shows_notice_and_api_503`、`TestDisabledFeature::test_unauth`
+- 证据:响应体、`/healthz`
+
 ## 2. NAS 真实环境验收流程(P3)
 
 | 步 | 操作 | 需用户确认 |
@@ -168,6 +287,7 @@ grep -r "FAKEKEY" .local/am-data/ app.log || echo "clean"
 | 7 | 切 `AM_BIND=192.168.1.150` + token,从 Windows 浏览器访问三页 | 否 |
 | 8 | 配置正式调度;观察 ≥3 个交易日 | 否(调度会自动跑,启用前告知用户) |
 | 9 | 填写 `docs/acceptance-records/<date>-nas.md`,合并 release → main,tag | 否 |
+| 10 | 财报服务只读健康检查 + 一次小任务(reports-fetcher,见 REPORTS-FETCHER.md §6:先 `GET /health/ready`、`GET /api/v1/reports` 只读,再 `last_n=1, refresh=false` 并读 warnings) | **是** |
 
 ## 3. 验收记录模板
 
