@@ -129,6 +129,8 @@ ssh chen@192.168.1.150 "cp /home/chen/docker/agents-manage/data/backup.db \
 | `queue_depth` | 排队任务数 | 持续增长 → 执行容器起不来,看对应 run 的 error |
 | `scheduler_jobs` | 已注册调度作业数 | 少于启用调度数 → 页面改一次任意调度触发 rebuild_jobs |
 | `current_run_id` | 当前执行 run | 长期不变 → 结合 `status_stale` 判断;看门狗会兜底取消 |
+| `reports.enabled` | 财报获取功能是否启用(已配 `REPORTS_API_BASE_URL`) | false → 功能关闭;启用方法见 [REPORTS-FETCHER.md §6](REPORTS-FETCHER.md) |
+| `reports.reachable` | 轮询线程能否连上 reports-fetcher | false → 服务不可达/base URL 错/容器未映射 `host.docker.internal`;见 [REPORTS-FETCHER.md §7](REPORTS-FETCHER.md) |
 
 常见错误:
 
@@ -140,6 +142,16 @@ ssh chen@192.168.1.150 "cp /home/chen/docker/agents-manage/data/backup.db \
 6. **退出码 0 但报告 ✗**:双重判定缺产物(investment_plan.md / memory 条目);run 详情 error 写明缺哪个,细节看 `container.log` 路径所指文件(经 SMB)。
 7. **`status_stale=1`**:status.json 超 `AM_STALE_MINUTES` 未更新或损坏;任务仍在跑等看门狗,进程已消失由 recover 判 `host_restarted`。
 8. **升级后 502 / 连不上**:`docker compose ps` + `docker compose logs agents-manage`;healthcheck 连续 3 次失败会标 unhealthy。
+
+## 8. 财报原文获取服务(可选)
+
+管理台可选对接 NAS 上的 reports-fetcher,提供「获取指定标的的历史财报原文」功能。生产只改环境变量即可启用:
+
+- 在 `deploy/.env` 设 `REPORTS_API_BASE_URL=http://host.docker.internal:8000`(不含 `/api/v1`;NAS 宿主回环的 8000),其余 `REPORTS_API_*` 用默认值即可。
+- 生产 compose 已含 `extra_hosts: ["host.docker.internal:host-gateway"]`(Linux Docker 28+ 与 Docker Desktop 均可用),容器即可访问 NAS 宿主回环上的服务。
+- 回退:清空 `REPORTS_API_BASE_URL` 即关闭功能,无需改代码。
+
+完整说明(功能范围、配置项、本地 mock 联调、切换生产检查清单与首次验证顺序、排查)见 [REPORTS-FETCHER.md](REPORTS-FETCHER.md) §6。部署后看 `/healthz` 的 `reports.enabled` / `reports.reachable`。
 
 ## 附:本地全链路验证(compose.local)
 

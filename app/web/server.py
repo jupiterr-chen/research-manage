@@ -24,10 +24,11 @@ from app.audit import scrub
 from app.config import Settings
 from app.executor.launcher import DockerLauncher
 from app.executor.worker import Worker
+from app.reports.poller import ReportsPoller
 from app.scheduler import Scheduler
 from app.services import schedules as services_schedules
 from app.web import auth
-from app.web.routes import api_runs, fragments, pages
+from app.web.routes import api_runs, fragments, pages, reports
 
 log = logging.getLogger("am.server")
 
@@ -40,6 +41,7 @@ def create_app(
     *,
     worker: Worker | None = None,
     scheduler: Scheduler | None = None,
+    reports_poller: ReportsPoller | None = None,
     db_factory: Callable[[], Connection] | None = None,
 ) -> FastAPI:
     settings = settings or Settings.load()
@@ -63,10 +65,12 @@ def create_app(
         # 调度表写操作 → 全量重建作业(DESIGN §4.9);关闭时解除接线
         services_schedules.on_change = app.state.scheduler.rebuild_jobs
         app.state.worker.start()
+        app.state.reports_poller.start()  # REPORTS_API_BASE_URL 未配置时为 no-op
         log.info("agents-manage 启动完成,配置:%s", scrub(settings.summary()))
         yield
         services_schedules.on_change = None
         app.state.scheduler.shutdown()
+        app.state.reports_poller.stop()
         app.state.worker.stop()
         log.info("agents-manage 已停止(worker 与 scheduler;执行容器不受影响)")
 
@@ -78,12 +82,14 @@ def create_app(
         db_factory=db_factory,
     )
     app.state.scheduler = scheduler or Scheduler(settings, db_factory)
+    app.state.reports_poller = reports_poller or ReportsPoller(settings, db_factory)
     app.state.templates = templates
 
     app.mount("/static", StaticFiles(directory=str(_WEB_DIR / "static")), name="static")
     app.include_router(pages.router)
     app.include_router(api_runs.router)
     app.include_router(fragments.router)
+    reports.register(app)
 
     @app.get("/healthz", tags=["ops"])
     async def healthz(request: Request, _: None = Depends(auth.require_auth)) -> JSONResponse:
@@ -97,6 +103,7 @@ def create_app(
                 "docker_ok": health["docker_ok"],
                 "scheduler_jobs": app.state.scheduler.jobs_count,
                 "current_run_id": health["current_run_id"],
+                "reports": app.state.reports_poller.health(),
                 "time": models.now_sh().isoformat(timespec="seconds"),
             }
         )

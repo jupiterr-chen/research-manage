@@ -67,6 +67,30 @@ _DDL = [
       ON run(instrument_id, analysis_date) WHERE status IN ('queued','running')
     """,
     """
+    CREATE TABLE IF NOT EXISTS report_job (        -- 财报原文获取任务(reports-fetcher 对接;本地跟踪记录)
+      id TEXT PRIMARY KEY,                          -- rj-YYYYMMDD-HHMMSS-<slug>
+      instrument_id INTEGER REFERENCES instrument(id),
+      market TEXT NOT NULL CHECK(market IN ('us','hk','cn')),
+      code TEXT NOT NULL,                           -- 本系统代码(1810.HK)
+      symbol TEXT NOT NULL,                         -- 提交给 reports-fetcher 的 symbol
+      last_n INTEGER NOT NULL DEFAULT 4,
+      refresh INTEGER NOT NULL DEFAULT 0,
+      idempotency_key TEXT NOT NULL UNIQUE,         -- 创建时生成,所有重试复用
+      remote_job_id TEXT,                           -- 服务端 job_id(提交成功后)
+      status TEXT NOT NULL CHECK(status IN
+        ('pending','queued','running','succeeded','partial','failed','timeout','error')),
+      trigger TEXT NOT NULL CHECK(trigger IN ('web','api')),
+      submit_attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT,                         -- 429 Retry-After 后的下次提交时间
+      progress_json TEXT, summary_json TEXT, results_json TEXT,
+      warnings_json TEXT,                           -- 汇总的证券级 warnings
+      report_ids_json TEXT,                         -- 可用报告 id 列表(partial 也保留)
+      error TEXT, error_code TEXT, error_retryable INTEGER,
+      created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT, updated_at TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_report_job_status ON report_job(status)",
+    """
     CREATE TABLE IF NOT EXISTS audit_log (
       id INTEGER PRIMARY KEY, ts TEXT NOT NULL,
       actor TEXT NOT NULL CHECK(actor IN ('web','api','schedule')),
@@ -81,6 +105,33 @@ _EXPECTED_COLUMNS: dict[str, list[str]] = {
     "instrument": ["id", "market", "code", "name", "enabled", "created_at", "updated_at"],
     "profile": ["id", "name", "analysts_csv", "is_default"],
     "schedule": ["id", "instrument_id", "profile_id", "kind", "at_time", "weekday", "enabled"],
+    "report_job": [
+        "id",
+        "instrument_id",
+        "market",
+        "code",
+        "symbol",
+        "last_n",
+        "refresh",
+        "idempotency_key",
+        "remote_job_id",
+        "status",
+        "trigger",
+        "submit_attempts",
+        "next_attempt_at",
+        "progress_json",
+        "summary_json",
+        "results_json",
+        "warnings_json",
+        "report_ids_json",
+        "error",
+        "error_code",
+        "error_retryable",
+        "created_at",
+        "started_at",
+        "finished_at",
+        "updated_at",
+    ],
     "run": [
         "id",
         "instrument_id",
