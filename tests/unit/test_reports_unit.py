@@ -119,6 +119,32 @@ class TestReportJobService:
         assert out["warnings"] == ["01810: 报告期未知(period_source=unknown)"] and out["error"] is None
         assert out["is_terminal"] and out["remote_job_id"] == "job_x"
 
+    def test_finalize_merges_coverage_notices(self, rconn):
+        job = rj.create(rconn, code="NVDA", market=None, last_n=2, refresh=False, trigger="web", actor="web")
+        rj.mark_submitted(rconn, job["id"], remote_job_id="job_n", remote_status="running")
+        doc = {
+            "status": "partial",
+            "results": [
+                {
+                    "symbol": "SYM",
+                    "status": "partial",
+                    "report_ids": [],
+                    "warnings": ["w1"],
+                    "coverage": {"notices": ["n1", "n1"]},
+                },
+                {"symbol": "SYM", "status": "succeeded", "report_ids": [], "coverage": {}},
+                {
+                    "symbol": "SYM",
+                    "status": "succeeded",
+                    "report_ids": [],
+                    "coverage": {"notices": "not-a-list"},
+                },
+            ],
+        }
+        out = rj.finalize_remote(rconn, job["id"], doc)
+        assert out["warnings"] == ["SYM: w1", "SYM: n1"]
+        assert out["report_ids"] == [] and out["error"] is None
+
     def test_finalize_failed_records_retryable_error(self, rconn):
         job = rj.create(rconn, code="NVDA", market=None, last_n=1, refresh=False, trigger="web", actor="web")
         rj.mark_submitted(rconn, job["id"], remote_job_id="job_f", remote_status="running")
@@ -406,6 +432,38 @@ class TestReportJobDetailRender:
         r = disabled_client.get(f"/reports/jobs/{jid}")
         assert r.status_code == 200
         assert "r_1" in r.text and "r_2" in r.text
+
+    def test_detail_renders_coverage_notices(self, settings, disabled_client):
+        """T-13:coverage.notices 在证券结果段以「提示」展示。"""
+        conn = connect(settings.db_path)
+        try:
+            job = rj.create(
+                conn, code="NVDA", market=None, last_n=1, refresh=False, trigger="web", actor="web"
+            )
+            rj.mark_submitted(conn, job["id"], remote_job_id="job_n", remote_status="running")
+            rj.finalize_remote(
+                conn,
+                job["id"],
+                {
+                    "status": "partial",
+                    "results": [
+                        {
+                            "symbol": "NVDA",
+                            "status": "partial",
+                            "report_ids": ["r_1"],
+                            "warnings": [],
+                            "coverage": {"notices": ["n1"]},
+                        },
+                        {"symbol": "MU", "status": "succeeded", "report_ids": []},
+                    ],
+                },
+            )
+            jid = job["id"]
+        finally:
+            conn.close()
+        r = disabled_client.get(f"/reports/jobs/{jid}")
+        assert r.status_code == 200
+        assert "n1" in r.text and "提示" in r.text
 
 
 # ---------------------------------------------------------------- 下载文件名(T-12)

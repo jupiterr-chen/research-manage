@@ -116,6 +116,7 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 | timeout → 刷新 | `timeout` 且已有服务端任务号时,可重新进入 `running` 再拉终态 | `app/services/report_jobs.py::reopen_for_refresh`;片段 `fragments/report_job_detail.html` |
 | HTTP 200 ≠ 成功 | `GET job` 返回 200 只代表拿到文档,只有 `status ∈ {succeeded, partial, failed}` 才落终态 | `app/reports/client.py::get_job`;`app/reports/poller.py::_poll`;`app/services/report_jobs.py::finalize_remote` |
 | partial 保留可用文件 | 无论 `partial` 还是 `failed`,都从 `results[].report_ids` 收集可用报告 | `app/services/report_jobs.py::finalize_remote` |
+| `coverage.notices` 展示 | `results[].coverage.notices`(报告期未知、逻辑报告组截断等聚合说明)并入任务 `warnings`(前缀 `symbol: `,同一证券内去重,`coverage` 缺失/`notices` 非列表时忽略),并在任务详情页证券结果段以「提示」列出 | `app/services/report_jobs.py::finalize_remote`;`app/web/templates/fragments/report_job_detail.html` |
 | `report_period=null` 不推测 | 报告期为空时页面显示「未知」,不臆造日期 | `app/web/templates/fragments/report_archive.html` |
 | 空结果合法 | `succeeded` + 证券 `no_reports` 是合法终态,页面提示「来源检索完成但没有匹配报告」 | `app/services/report_jobs.py::finalize_remote`;`app/web/templates/fragments/report_job_detail.html` |
 | sha256 / ETag 校验 | 下载后计算 sha256,与给出的 `expected_sha256` 及响应 `ETag` 比对,不一致抛 `ChecksumMismatch` | `app/reports/client.py::download_report_file` |
