@@ -453,7 +453,7 @@ def artifacts(conn: sqlite3.Connection, settings: Settings, run_id: str) -> list
     run = get(conn, run_id)
     reports_dir = Path(settings.ta_data_dir) / "logs" / run["code"] / run["analysis_date"] / "reports"
     names = sorted(p.name for p in reports_dir.glob("*.md")) if reports_dir.is_dir() else []
-    rel = [f"logs/{run['code']}/{run['analysis_date']}/reports/{n}" for n in names]
+    rel = [f"{run['code']}/{run['analysis_date']}/reports/{n}" for n in names]
     prefix = settings.smb_prefix.strip()
     if not prefix:
         return rel
