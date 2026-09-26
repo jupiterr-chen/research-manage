@@ -376,7 +376,7 @@ class TestQueries:
         (Path(settings.ta_data_dir) / "logs" / "1810.HK" / TODAY / "reports" / "market_report.md").touch()
         rid = insert_run(conn, inst["id"], status="succeeded")
         out = runs.artifacts(conn, settings, rid)
-        rel = f"logs/1810.HK/{TODAY}/reports/investment_plan.md"
+        rel = f"1810.HK/{TODAY}/reports/investment_plan.md"
         assert rel in out and len(out) == 2
         settings.smb_prefix = "\\\\192.168.1.150\\docker\\ta"
         out2 = runs.artifacts(conn, settings, rid)

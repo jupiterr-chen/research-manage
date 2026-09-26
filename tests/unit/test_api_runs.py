@@ -192,7 +192,7 @@ class TestArtifacts:
         r = api_client.get(f"/api/v1/runs/{rid}/artifacts")
         assert r.status_code == 200
         body = r.json()
-        assert body["paths"] == ["\\\\nas\\ta\\logs\\1810.HK\\2026-09-14\\reports\\investment_plan.md"]
+        assert body["paths"] == ["\\\\nas\\ta\\1810.HK\\2026-09-14\\reports\\investment_plan.md"]
         assert "机密内容" not in r.text
 
     def test_empty_and_404(self, api_client, dbconn):
