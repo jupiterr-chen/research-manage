@@ -37,6 +37,7 @@ class Settings:
     db_path: str = ""
     ta_data_dir: str = ""
     ta_data_host: str = ""
+    ta_logs_host: str = ""  # 报告根独立成卷时的宿主路径(空 = 随 ta_data_host)
     ta_env_host: str = ""
     runner_host: str = ""
     ta_image: str = "tradingagents-tradingagents:latest"
@@ -94,6 +95,7 @@ class Settings:
             db_path=get("AM_DB_PATH", ""),
             ta_data_dir=get("AM_TA_DATA_DIR", ""),
             ta_data_host=get("AM_TA_DATA_HOST", ""),
+            ta_logs_host=get("AM_TA_LOGS_HOST", ""),
             ta_env_host=get("AM_TA_ENV_HOST", ""),
             runner_host=get("AM_RUNNER_HOST", ""),
             ta_image=get("AM_TA_IMAGE", "tradingagents-tradingagents:latest"),
@@ -187,6 +189,7 @@ class Settings:
             "db_path": self.db_path,
             "ta_data_dir": self.ta_data_dir,
             "ta_data_host": self.ta_data_host,
+            "ta_logs_host": self.ta_logs_host or "(随 AM_TA_DATA_HOST)",
             "ta_env_host": self.ta_env_host,
             "runner_host": self.runner_host,
             "ta_image": self.ta_image,
