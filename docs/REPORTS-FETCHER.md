@@ -113,6 +113,7 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 | 幂等键复用 | 本地任务创建时生成并固定 `Idempotency-Key`(`am-<uuid>`);同一任务的所有提交重试复用同键 | `app/services/report_jobs.py::create`;`app/reports/poller.py::ReportsPoller._submit` |
 | 429 / 409 处理 | 429 或可重试错误按 `Retry-After` 延后、状态保持 `pending`;`idempotency_conflict` 等不可重试错误落 `error` | `app/reports/poller.py::_submit`(`NON_RETRYABLE_SUBMIT`);`app/services/report_jobs.py::mark_submit_retry` |
 | 有界轮询 | 每任务独立退避(`poll_interval`→`poll_max_interval`),单次请求超时不超过剩余预算;从 `started_at` 起超 `max_wait` → `timeout` | `app/reports/client.py::wait_for_terminal`;`app/reports/poller.py::_poll` / `_remaining_budget` |
+| 空闲健康探测 | 任务之外按 `PROBE_INTERVAL_SECONDS`(60s,`monotonic` 节流)只读 `GET /health/ready`;超时 `min(3s, REPORTS_API_TIMEOUT)`;未配置不探测;401/403/503 → `reachable=true, ready=false`;失败不阻断任务、异常不杀线程 | `app/reports/client.py::health_ready`;`app/reports/poller.py::_maybe_probe` / `health` |
 | timeout → 刷新 | `timeout` 且已有服务端任务号时,可重新进入 `running` 再拉终态 | `app/services/report_jobs.py::reopen_for_refresh`;片段 `fragments/report_job_detail.html` |
 | HTTP 200 ≠ 成功 | `GET job` 返回 200 只代表拿到文档,只有 `status ∈ {succeeded, partial, failed}` 才落终态 | `app/reports/client.py::get_job`;`app/reports/poller.py::_poll`;`app/services/report_jobs.py::finalize_remote` |
 | partial 保留可用文件 | 无论 `partial` 还是 `failed`,都从 `results[].report_ids` 收集可用报告 | `app/services/report_jobs.py::finalize_remote` |
@@ -151,15 +152,23 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 
 ## 7. 故障排查
 
+`ReportsPoller` 除任务轮询外,还以固定低频(默认 60s,`monotonic` 节流)只读探测 `GET /health/ready`:
+单次超时 ≤3s 且不超过 `REPORTS_API_TIMEOUT`;功能未配置时不请求;启动/空闲(无需先建任务)即可刷新状态;
+探测失败不阻断任务、异常不外抛。**HTTP 可达与就绪分开**:401/403/503 记为 `reachable=true, ready=false`,
+绝不显示为「正常」。
+
 `GET /healthz` 的 `reports` 字段(`ReportsPoller.health()`):
 
 | 字段 | 含义 | 异常时 |
 |---|---|---|
 | `enabled` | `REPORTS_API_BASE_URL` 是否已配置 | false → 功能关闭,页面提交会提示未配置 |
 | `alive` | 轮询线程是否在跑 | false 且 enabled=true → 看日志 `[reports]`;未配置时为 false 属正常 |
-| `reachable` | 最近一次 HTTP 调用的可达性(`true/false/null`=尚未探测) | false → base URL 错 / 服务不可达 / 未映射 `host.docker.internal` |
+| `reachable` | 最近一次 HTTP(探测或任务)的可达性(`true/false/null`=尚未调用) | false → base URL 错 / 服务不可达 / 未映射 `host.docker.internal` |
+| `ready` | 最近一次 `/health/ready` 是否就绪(200 且 `status="ok"`);`true/false/null`=尚未探测 | false → 服务在但未就绪(401/403/503 等),页面显示「未就绪」而非「正常」 |
 | `active` | 当前轮询中的任务数 | 长期不降 → 任务卡在轮询,结合单任务状态与 warnings 看 |
-| `last_error` | 最近一次错误(已 scrub) | 用于快速定位连接/超时/上游错误 |
+| `last_error` | 最近一次任务/连接错误(已 scrub) | 用于快速定位连接/超时/上游错误 |
+| `last_probe_at` | 最近一次健康探测时间(ISO8601,+08:00);null=未探测 | 长时间不更新 → 轮询线程可能未起 |
+| `probe_error` | 最近一次探测失败原因(已 scrub),与 `last_error` 分离 | 用于区分「探测不到」与「任务业务错误」 |
 
 常见错误:
 

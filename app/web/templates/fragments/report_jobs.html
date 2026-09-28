@@ -5,8 +5,12 @@
   <section class="card">
     <h2>获取任务
       {% if reports_health and reports_health.enabled %}
-      <span class="light {% if reports_health.reachable %}ok{% elif reports_health.reachable is none %}warn{% else %}bad{% endif %}"
-            title="reports-fetcher 可达性(最近一次调用)">服务{% if reports_health.reachable %}可达{% elif reports_health.reachable is none %}未探测{% else %}不可达{% endif %}</span>
+      {% set _reach = reports_health.reachable %}
+      {% set _ready = reports_health.get('ready') %}
+      {% set _checked = reports_health.get('last_probe_at') %}
+      {% set _perr = reports_health.get('probe_error') %}
+      <span class="light {% if _reach is false or _ready is false %}bad{% elif _ready is true %}ok{% else %}warn{% endif %}"
+            title="reports-fetcher /health/ready 健康探测{% if _ready is none and not _checked %} · 等待首次自动探测(启动后自动进行){% endif %}{% if _checked %} · 最近检查 {{ _checked }}{% endif %}{% if _perr %} · {{ _perr }}{% endif %}">服务{% if _reach is false %}不可达{% elif _ready is true %}正常{% elif _ready is false %}未就绪{% else %}未探测{% endif %}</span>
       {% endif %}
     </h2>
     {% if jobs %}

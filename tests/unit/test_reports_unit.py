@@ -192,6 +192,14 @@ class FakeReportsClient:
         self.submit_script: list = []  # 每次 submit 弹出一个:("ok", job_id) | Exception
         self.job_docs: dict[str, list[dict]] = {}
         self.get_calls = 0
+        self.health_calls: list[float | None] = []  # 记录 health_ready 收到的 timeout
+        self.health_ready_result: dict | Exception = {"status": "ok"}  # 脚本化探测结果
+
+    def health_ready(self, *, timeout=None):
+        self.health_calls.append(timeout)
+        if isinstance(self.health_ready_result, Exception):
+            raise self.health_ready_result
+        return self.health_ready_result
 
     def submit_job(self, symbols, *, idempotency_key, last_n, refresh, forms_by_market=None):
         self.submit_calls.append(
@@ -284,6 +292,8 @@ class TestPoller:
     def test_connection_failure_retries_same_key(self, poller_env):
         s, conn, fake, poller = poller_env
         job = rj.create(conn, code="NVDA", market=None, last_n=1, refresh=False, trigger="web", actor="web")
+        # 探测与任务同源故障:首个 tick 的探测也连不上,reachable 保持 False
+        fake.health_ready_result = ConnectionFailed("refused")
         fake.submit_script = [ConnectionFailed("refused"), ("ok", "job_3")]
         fake.job_docs["job_3"] = [{"status": "succeeded", "results": []}]
         poller.tick_once()
@@ -585,7 +595,16 @@ class _FakePoller:
         pass
 
     def health(self):
-        return {"enabled": True, "alive": True, "reachable": True, "active": 0, "last_error": None}
+        return {
+            "enabled": True,
+            "alive": True,
+            "reachable": True,
+            "ready": True,
+            "active": 0,
+            "last_error": None,
+            "last_probe_at": None,
+            "probe_error": None,
+        }
 
 
 @contextmanager
