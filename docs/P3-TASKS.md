@@ -21,6 +21,7 @@
 | T-11 | S1 | fixed(fix/T-11-reports-network) | v1.2 上线 | `host.docker.internal:host-gateway` 解析到网桥网关 172.17.0.1,reports-fetcher 只发布在宿主回环 127.0.0.1:8000 → 容器 Connection refused;本地 mock 测试无法暴露(Docker Desktop 的 host.docker.internal 语义不同) | 管理台加入外部网络 `reports-fetcher_default`,`REPORTS_API_BASE_URL=http://serve:8000`;文档同步 | `deploy/docker-compose.yml`、REPORTS-FETCHER.md §6、DEPLOY §8、.env.example |
 | T-12 | S2 | fixed(fix/T-12-download-filename,opencode T-0003) | 0700.HK 探针 | 代理下载只转发上游 `Content-Disposition` 的 ASCII `filename=`(中文已被上游替换成下划线),丢掉了 RFC 5987 的 `filename*=UTF-8''…`,浏览器拿到的文件名是 `unknown__INTERIM______ 2026__…pdf` | `api_archive_file` 同时输出 `filename=`(ASCII 回退)与 `filename*=UTF-8''<percent-encoded>`;`client._filename_from_disposition` 优先取 `filename*`;并把本系统代码+doc_type+filing_date 组成更可读的回退名 | `app/web/routes/reports.py::api_archive_file`、`app/reports/client.py::_filename_from_disposition` |
 | T-13 | S2 | fixed(fix/T-13-coverage-notices,opencode T-0004) | 契约更新 2026-09-22 | 新契约把「报告期未知」等聚合进 `coverage.notices`,详情页未展示、未并入 warnings | notices 并入任务 warnings(去重)+ 证券结果段展示 | `app/services/report_jobs.py::finalize_remote`、`fragments/report_job_detail.html` |
+| T-14 | S3 | in_progress(fix/T-14-reports-health-probe,opencode T-0005;本地通过,未部署) | 生产管理台只读复核 2026-09-28 | `ReportsPoller` 无独立健康探测,`_reachable` 仅由 `_submit`/`_poll` 更新:重启且无任务时永远 `null`,页面长期显示「服务未探测」(fetch `/health/ready` 实际 200) | 任务之外按固定低频(60s,`monotonic` 节流)只读 `GET /health/ready`,超时 ≤3s 且不超已配置超时;区分 `reachable` 与 `ready`(401/403/503 → 未就绪,不显示正常);未配置不探测、失败不阻断任务;新增 `ready`/`last_probe_at`/`probe_error`(向后兼容) | `app/reports/client.py::health_ready`、`app/reports/poller.py::_maybe_probe`、`fragments/report_jobs.html`、`docs/DESIGN.md §4.12` |
 
 ## 记录
 
@@ -30,3 +31,4 @@
 - 2026-09-15 T-07:由验收方修复;AM-07 的本地验收(FAKEKEY 假值)之所以没抓到,是因为 sim 与 llm-stub 不会像真实上游那样把带 key 的 URL 打进日志——建议开发 agent 在 sim 的 `fail` 模式里加一行含 `api_key=` 的 stderr 输出,让 AM-07 本地用例覆盖该形态。
 - 2026-09-16 T-10:由验收方修复(用户调整 HK 调度为周频早于日频后暴露;09-21 周一前必须上线)。附带交付 `scripts/apply_schedules.py`(经 HTTP 接口批量建调度,幂等)与 `deploy/schedules/us-2026-09-16.json`。
 - 2026-09-22 T-12:上游其实给了正确的 `filename*`(UTF-8 中文),丑名字一半是本系统代理丢字段造成;另一半(`unknown__` 前缀、无代码、report_period=null)属 reports-fetcher,已整理成问题清单交用户转给该项目。
+- 2026-09-28 T-14:由 opencode 在 `fix/T-14-reports-health-probe` 本地实现并自测(单测 + 本地 mock 集成);**未提交、未合并、未部署**。生产上「服务未探测」根因是探测缺失而非 fetcher 故障。

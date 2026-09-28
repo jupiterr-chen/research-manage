@@ -24,6 +24,7 @@ from urllib.parse import unquote
 import pytest
 from fastapi.testclient import TestClient
 
+from app import db as app_db
 from app.db import connect
 from app.reports.client import (
     ChecksumMismatch,
@@ -31,6 +32,7 @@ from app.reports.client import (
     ReportsClient,
     WaitTimeout,
 )
+from app.reports.poller import ReportsPoller
 from app.services import instruments as inst_srv
 from app.web.server import create_app
 from tests.conftest import FakeLauncher
@@ -287,6 +289,31 @@ class TestClientContract:
                     if "X-Mock-Scenario" in node.value or "/__mock/" in node.value:
                         offenders.append(str(path))
         assert offenders == [], f"业务代码含 mock 控制项:{offenders}"
+
+
+# ============================================================ 1b. 空闲健康探测(T-14)
+
+
+class TestPollerHealthProbe:
+    def test_idle_probe_reports_ready_against_real_mock(self, tmp_path, make_settings):
+        """无任务时首个 tick 只读 GET /health/ready,即可把 ready 刷成 True。"""
+        s = make_settings(reports_base_url=MOCK, reports_timeout=5.0)
+        s.db_path = str(tmp_path / "probe.db")
+        conn = connect(s.db_path)
+        app_db.migrate(conn)
+        conn.close()
+        poller = ReportsPoller(s, lambda: connect(s.db_path), probe_interval=60.0)
+        try:
+            before = poller.health()
+            assert before["enabled"] is True and before["ready"] is None
+            poller.tick_once()  # 空闲探测
+            after = poller.health()
+            assert after["ready"] is True and after["reachable"] is True
+            assert after["last_probe_at"] and after["probe_error"] is None
+            # 契约:真实 mock 的 /health/ready 返回 status=ok
+            assert poller.client.health_ready(timeout=3.0)["status"] == "ok"
+        finally:
+            poller.stop()
 
 
 def _raw(req):

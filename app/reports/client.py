@@ -151,8 +151,9 @@ class ReportsClient:
     def health_live(self) -> dict:
         return self._json("GET", "/health/live")[1]
 
-    def health_ready(self) -> dict:
-        return self._json("GET", "/health/ready")[1]
+    def health_ready(self, *, timeout: float | None = None) -> dict:
+        """只读就绪探测:200 且 `status="ok"` 才算就绪;401/403/503 抛 `ProblemError`。"""
+        return self._json("GET", "/health/ready", timeout=timeout)[1]
 
     # ------------------------------------------------------------------ 任务
     def submit_job(

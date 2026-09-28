@@ -286,6 +286,28 @@ htmx 约定:片段接口只返回 `<div id=...>` 可 `hx-swap="outerHTML"` 的�
 - 登录限速:内存 `{ip: deque[timestamps]}`,5 次/60s;超限 429
 - `secrets.compare_digest` 比较
 
+### 4.12 财报服务健康探测(`app/reports/poller.py`)
+
+`ReportsPoller` 在任务轮询之外,按固定间隔只读 `GET /health/ready` 刷新服务健康:启动/空闲即可反映状态,无需先建任务。
+单次探测超时 = `min(3s, REPORTS_API_TIMEOUT)`;节流用 `time.monotonic`;功能未配置(`REPORTS_API_BASE_URL` 空)时不探测;
+探测不阻塞任务流程、异常不外抛(不杀死线程、不忙循环);不在 Web 请求中同步探测。
+
+`/healthz` 的 `reports` 字段与页面片段共用的 `ReportsPoller.health()` 返回(新增字段均向后兼容):
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `enabled` | bool | 功能是否已配置 |
+| `alive` | bool | 轮询线程是否在跑 |
+| `reachable` | bool \| null | 最近一次 HTTP(探测或任务调用)是否到达服务;null = 尚未调用 |
+| `ready` | bool \| null | 最近一次 `/health/ready` 是否就绪(200 且 `status="ok"`);401/403/503 亦为 false;null = 尚未探测 |
+| `active` | int | 轮询中的任务数 |
+| `last_error` | str \| null | 最近一次任务/连接错误(已 scrub) |
+| `last_probe_at` | str \| null | 最近一次健康探测时间(ISO8601,+08:00);null = 未探测 |
+| `probe_error` | str \| null | 最近一次探测失败原因(已 scrub);与任务的 `last_error` 分离,互不覆盖 |
+
+页面徽标按 `reachable`/`ready` 判定:`reachable=false` → 不可达;`ready=false` → 未就绪;`ready=true` → 正常;
+二者未知 → 未探测(文案说明等待首次探测)。`last_probe_at`/`probe_error` 经 `scrub` 后由 Jinja 自动转义渲染。
+
 ## 5. 状态机
 
 ```

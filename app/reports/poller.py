@@ -9,6 +9,8 @@ Web 层的归档代理里,任务状态只写 SQLite(services.report_jobs)。
 - 轮询:每任务独立退避(poll_interval → poll_max_interval);单次请求超时不超过剩余预算;
   从 started_at 起超过 max_wait → timeout(服务端任务可能仍在跑,可手动刷新)。
 - HTTP 200 不代表成功:只有 status ∈ {succeeded, partial, failed} 才落终态。
+- 健康:任务之外按固定低频(monotonic 节流)只读 GET /health/ready,空闲/启动即可反映状态;
+  探测单次超时 ≤3s 且不超过已配置请求超时,失败不阻断任务、不忙循环;功能关闭时不探测。
 """
 
 from __future__ import annotations
@@ -35,6 +37,8 @@ from app.services import report_jobs
 log = logging.getLogger("am.reports")
 
 TICK_SECONDS = 1.0
+PROBE_INTERVAL_SECONDS = 60.0  # 空闲健康探测间隔(固定低频,不额外加配置项)
+PROBE_TIMEOUT_SECONDS = 3.0  # 探测单次超时上限;实际取 min(此值, REPORTS_API_TIMEOUT)
 NON_RETRYABLE_SUBMIT = {
     "idempotency_conflict",
     "invalid_request",
@@ -66,6 +70,7 @@ class ReportsPoller(threading.Thread):
         client: ReportsClient | None = None,
         *,
         tick: float = TICK_SECONDS,
+        probe_interval: float = PROBE_INTERVAL_SECONDS,
     ):
         super().__init__(name="reports-poller", daemon=True)
         self.settings = settings
@@ -73,11 +78,16 @@ class ReportsPoller(threading.Thread):
         self.enabled = settings.reports_enabled
         self.client = client or (build_client(settings) if self.enabled else None)
         self.tick = tick
+        self.probe_interval = float(probe_interval)
         self._stop_event = threading.Event()
         self._next_poll: dict[str, tuple[float, float]] = {}  # job_id → (next_at_monotonic, interval)
         self._last_tick: float | None = None
         self._last_error: str | None = None
         self._reachable: bool | None = None
+        self._next_probe_at = 0.0  # monotonic;0 → 首个 tick 即探测
+        self._ready: bool | None = None
+        self._last_probe_at: str | None = None
+        self._probe_error: str | None = None
 
     # ---------------------------------------------------------------- 生命周期
     def start(self) -> None:  # type: ignore[override]
@@ -95,9 +105,14 @@ class ReportsPoller(threading.Thread):
         return {
             "enabled": self.enabled,
             "alive": self.is_alive(),
+            # reachable:最近一次 HTTP(探测或任务调用)是否到达服务;ready:最近一次 /health/ready 是否就绪。
             "reachable": self._reachable,
+            "ready": self._ready,
             "active": len(self._next_poll),
+            # last_error 只记任务/连接错误;probe_error 只记探测失败,二者互不覆盖。
             "last_error": self._last_error,
+            "last_probe_at": self._last_probe_at,
+            "probe_error": self._probe_error,
         }
 
     def run(self) -> None:
@@ -129,6 +144,40 @@ class ReportsPoller(threading.Thread):
                 self._next_poll.pop(stale, None)
         finally:
             conn.close()
+        self._maybe_probe()
+
+    # ---------------------------------------------------------------- 健康探测
+    def _maybe_probe(self) -> None:
+        """空闲也定期只读 `GET /health/ready` 刷新健康;节流用 monotonic,异常不外抛。
+
+        不提交任务、不扫描外站;功能未配置时不请求;探测失败不影响任务流程(不阻断、不忙循环)。
+        """
+        if not self.enabled or self.client is None:
+            return
+        now = time.monotonic()
+        if now < self._next_probe_at:
+            return
+        self._next_probe_at = now + self.probe_interval  # 先记到期时间,异常也不会忙循环
+        timeout = min(PROBE_TIMEOUT_SECONDS, self.settings.reports_timeout)
+        try:
+            doc = self.client.health_ready(timeout=timeout)
+        except ProblemError as e:
+            # HTTP 已到达但服务未就绪(401/403/503…):reachable=True、ready=False。
+            self._reachable = True
+            self._ready = False
+            self._probe_error = scrub(f"HTTP {e.status} [{e.code}]")[:200]
+        except (ConnectionFailed, RequestTimeout) as e:
+            self._reachable = False
+            self._ready = False
+            self._probe_error = scrub(str(e))[:200]
+        except Exception as e:  # noqa: BLE001 - 探测异常不得杀死轮询线程
+            self._ready = False
+            self._probe_error = scrub(f"{type(e).__name__}: {e}")[:200]
+        else:
+            self._reachable = True
+            self._ready = bool(isinstance(doc, dict) and doc.get("status") == "ok")
+            self._probe_error = None
+        self._last_probe_at = models.now_sh().isoformat(timespec="seconds")
 
     # ---------------------------------------------------------------- 提交
     def _submit(self, conn, job: dict) -> None:
