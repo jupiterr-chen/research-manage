@@ -161,6 +161,28 @@ class TestLauncher:
         assert "sk-abcdefgh12345678" in raw
         assert "sk-abcdefgh12345678" not in scrub(raw)  # worker 落档前 scrub
 
+    def test_nested_logs_mount_when_configured(self):
+        """AM_TA_LOGS_HOST 设置时:执行容器 <data>/logs 被嵌套挂载到报告根。"""
+        client = FakeDockerClient()
+        launcher = DockerLauncher(client=client)
+        launcher.start(make_spec(ta_logs_host="/vol2/1000/10.Develop/TradingAgents"))
+        assert client.run_kwargs["volumes"]["/vol2/1000/10.Develop/TradingAgents"] == {
+            "bind": "/home/appuser/.tradingagents/logs",
+            "mode": "rw",
+        }
+
+    def test_no_nested_logs_mount_by_default(self):
+        """AM_TA_LOGS_HOST 为空时:挂载集合与原来完全一致(向后兼容)。"""
+        client = FakeDockerClient()
+        launcher = DockerLauncher(client=client)
+        launcher.start(make_spec())
+        assert set(client.run_kwargs["volumes"]) == {
+            "/host/ta",
+            "/host/ta/.env",
+            "/host/runner/runner.py",
+            "/host/data/runs/r-x",
+        }
+
     def test_parse_sim_env(self):
         assert parse_sim_env("") == {}
         assert parse_sim_env("SIM_MODE=fail") == {"SIM_MODE": "fail"}

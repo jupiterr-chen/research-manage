@@ -153,6 +153,7 @@ class Worker(threading.Thread):
                 date=run["analysis_date"],
                 analysts=tuple(run["analysts_csv"].split(",")),
                 ta_data_host=self.settings.ta_data_host,
+                ta_logs_host=self.settings.ta_logs_host,
                 ta_env_host=self.settings.ta_env_host,
                 runner_host=self.settings.runner_host,
                 workspace_host=workspace_host,

@@ -33,6 +33,7 @@ class ContainerSpec:
     workdir: str
     stop_timeout: int
     extra_env: dict[str, str] = field(default_factory=dict)
+    ta_logs_host: str = ""  # 报告根独立成卷时的宿主路径(空 = 随 ta_data_host)
 
 
 def parse_sim_env(raw: str) -> dict[str, str]:
@@ -75,6 +76,15 @@ class DockerLauncher:
 
     def start(self, spec: ContainerSpec) -> str:
         """按 SPEC §6.3 启动执行容器,返回 container id。"""
+        volumes = {
+            spec.ta_data_host: {"bind": spec.ta_container_data, "mode": "rw"},
+            spec.ta_env_host: {"bind": f"{spec.workdir}/.env", "mode": "ro"},
+            spec.runner_host: {"bind": RUNNER_CONTAINER_PATH, "mode": "ro"},
+            spec.workspace_host: {"bind": WORKSPACE_CONTAINER_PATH, "mode": "rw"},
+        }
+        if spec.ta_logs_host:
+            # 报告根目录独立成卷:以更深路径覆盖容器内 <data>/logs(嵌套挂载)
+            volumes[spec.ta_logs_host] = {"bind": f"{spec.ta_container_data}/logs", "mode": "rw"}
         container = self.client.containers.run(
             image=spec.image,
             name=f"am-{spec.run_id}",
@@ -92,12 +102,7 @@ class DockerLauncher:
                 spec.run_id,
             ],
             working_dir=spec.workdir,
-            volumes={
-                spec.ta_data_host: {"bind": spec.ta_container_data, "mode": "rw"},
-                spec.ta_env_host: {"bind": f"{spec.workdir}/.env", "mode": "ro"},
-                spec.runner_host: {"bind": RUNNER_CONTAINER_PATH, "mode": "ro"},
-                spec.workspace_host: {"bind": WORKSPACE_CONTAINER_PATH, "mode": "rw"},
-            },
+            volumes=volumes,
             environment={"AM_RUN_ID": spec.run_id, "TZ": "Asia/Shanghai", **spec.extra_env},
             stop_signal="SIGINT",
             detach=True,
