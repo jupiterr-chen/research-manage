@@ -55,7 +55,7 @@
       <tbody>
         {% for s in schedules_by_inst.get(inst.id, []) %}
         <tr>
-          <td class="mono">#{{ s.id }} {% if not s.enabled %}<span class="muted">(已停用)</span>{% endif %}</td>
+          <td class="mono">#{{ s.id }} <span class="badge" title="同刻执行顺序">序{{ s.seq }}</span> {% if not s.enabled %}<span class="muted">(已停用)</span>{% endif %}</td>
           <td>{{ describe_by_sched.get(s.id, "") }}</td>
           <td class="sched-ops">
             <form hx-post="/fragments/schedules/{{ s.id }}/toggle" hx-target="#instruments-block" hx-swap="outerHTML" class="inline">
@@ -73,6 +73,7 @@
                   </select>
                 </label>
                 <label>时间 <input name="at_time" value="{{ s.at_time }}" placeholder="08:30"></label>
+                <label>顺序 <input type="number" name="seq" value="{{ s.seq }}" min="0" style="width:64px" title="同刻触发的执行顺序(小者先)"></label>
                 <label>周几(周频)
                   <select name="weekday">
                     <option value="">—</option>
@@ -107,6 +108,7 @@
                   </select>
                 </label>
                 <label>时间 <input name="at_time" value="08:30"></label>
+                <label>顺序 <input type="number" name="seq" value="0" min="0" style="width:64px" title="同刻触发的执行顺序(小者先)"></label>
                 <label>周几(周频)
                   <select name="weekday">
                     <option value="">—</option>

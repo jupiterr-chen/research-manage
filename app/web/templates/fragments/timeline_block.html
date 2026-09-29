@@ -1,0 +1,55 @@
+<div id="timeline-block">
+  <section class="card">
+    <h2>每日交易日</h2>
+    <p class="muted">同一时刻触发的任务按「顺序」(seq,小者先)依次排队执行;建议全部设同一开始时间,用顺序控制优先级。</p>
+    <table>
+      <thead><tr><th>时间</th><th>顺序</th><th>标的</th><th>档案</th><th>说明</th><th>状态</th></tr></thead>
+      <tbody>
+        {% for r in timeline_rows if r.kind == 'daily_trading' %}
+        <tr class="{% if not r.enabled or not r.inst_enabled %}row-disabled{% endif %}">
+          <td class="mono">{{ r.at_time }}</td>
+          <td class="mono">{{ r.seq }}</td>
+          <td><strong>{{ r.code }}</strong>{% if r.instrument_name %} <span class="muted">{{ r.instrument_name }}</span>{% endif %}</td>
+          <td>{{ r.profile_name }}</td>
+          <td>{{ r.describe }}</td>
+          <td>
+            {% if not r.inst_enabled %}<span class="light bad">标的停用</span>
+            {% elif not r.enabled %}<span class="light warn">调度停用</span>
+            {% else %}<span class="light ok">启用</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">暂无日频调度</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>每周</h2>
+    <table>
+      <thead><tr><th>周几</th><th>时间</th><th>顺序</th><th>标的</th><th>档案</th><th>说明</th><th>状态</th></tr></thead>
+      <tbody>
+        {% for r in timeline_rows if r.kind == 'weekly' %}
+        <tr class="{% if not r.enabled or not r.inst_enabled %}row-disabled{% endif %}">
+          <td>周{{ weekday_label.get(r.weekday, '?') }}</td>
+          <td class="mono">{{ r.at_time }}</td>
+          <td class="mono">{{ r.seq }}</td>
+          <td><strong>{{ r.code }}</strong>{% if r.instrument_name %} <span class="muted">{{ r.instrument_name }}</span>{% endif %}</td>
+          <td>{{ r.profile_name }}</td>
+          <td>{{ r.describe }}</td>
+          <td>
+            {% if not r.inst_enabled %}<span class="light bad">标的停用</span>
+            {% elif not r.enabled %}<span class="light warn">调度停用</span>
+            {% else %}<span class="light ok">启用</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="muted">暂无周频调度</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <p class="muted">编辑顺序/时间:切到「按标的」视图,在对应调度行的「编辑」里修改。</p>
+</div>

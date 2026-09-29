@@ -279,3 +279,12 @@ th { color: var(--muted); font-weight: 600; }
 
 .run-title { font-size: 16px; margin: 4px 0 12px; word-break: break-all; }
 .fires { margin: 0; padding-left: 18px; }
+
+/* 时间线视图与视图切换 */
+.view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.view-tabs a {
+  padding: 4px 14px; border: 1px solid var(--line); border-radius: 16px;
+  color: var(--muted); background: var(--panel);
+}
+.view-tabs a.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.row-disabled td { opacity: 0.55; }

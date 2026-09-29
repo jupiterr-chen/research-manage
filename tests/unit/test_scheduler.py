@@ -125,7 +125,13 @@ class TestTriggerSemantics:
         with freezer("2026-09-14 08:00:00"):  # 周一 08:00
             fires = sched.next_fires(date(2026, 9, 14))
             assert fires == [
-                {"schedule_id": 1, "code": "1810.HK", "at": "08:30", "analysts": "market,social,news"}
+                {
+                    "schedule_id": 1,
+                    "code": "1810.HK",
+                    "at": "08:30",
+                    "seq": 0,
+                    "analysts": "market,social,news",
+                }
             ]
         with freezer("2026-09-14 08:31:00"):  # 已过点 → 今日无剩余
             assert sched.next_fires(date(2026, 9, 14)) == []
