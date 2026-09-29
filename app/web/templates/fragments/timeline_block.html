@@ -1,14 +1,22 @@
 <div id="timeline-block">
+  {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
+
   <section class="card">
     <h2>每日交易日</h2>
-    <p class="muted">同一时刻触发的任务按「顺序」(seq,小者先)依次排队执行;建议全部设同一开始时间,用顺序控制优先级。</p>
+    <p class="muted">同一时刻触发的任务按「顺序」(小者先)依次排队执行;建议同批设同一开始时间,用顺序控制优先级。顺序可直接在本表修改。</p>
     <table>
       <thead><tr><th>时间</th><th>顺序</th><th>标的</th><th>档案</th><th>说明</th><th>状态</th></tr></thead>
       <tbody>
         {% for r in timeline_rows if r.kind == 'daily_trading' %}
         <tr class="{% if not r.enabled or not r.inst_enabled %}row-disabled{% endif %}">
           <td class="mono">{{ r.at_time }}</td>
-          <td class="mono">{{ r.seq }}</td>
+          <td>
+            <form hx-post="/fragments/schedules/{{ r.id }}/seq" hx-target="#timeline-block"
+                  hx-swap="outerHTML" class="seq-form">
+              <input type="number" name="seq" value="{{ r.seq }}" min="0" class="seq-input">
+              <button type="submit" title="保存顺序">存</button>
+            </form>
+          </td>
           <td><strong>{{ r.code }}</strong>{% if r.instrument_name %} <span class="muted">{{ r.instrument_name }}</span>{% endif %}</td>
           <td>{{ r.profile_name }}</td>
           <td>{{ r.describe }}</td>
@@ -34,7 +42,13 @@
         <tr class="{% if not r.enabled or not r.inst_enabled %}row-disabled{% endif %}">
           <td>周{{ weekday_label.get(r.weekday, '?') }}</td>
           <td class="mono">{{ r.at_time }}</td>
-          <td class="mono">{{ r.seq }}</td>
+          <td>
+            <form hx-post="/fragments/schedules/{{ r.id }}/seq" hx-target="#timeline-block"
+                  hx-swap="outerHTML" class="seq-form">
+              <input type="number" name="seq" value="{{ r.seq }}" min="0" class="seq-input">
+              <button type="submit" title="保存顺序">存</button>
+            </form>
+          </td>
           <td><strong>{{ r.code }}</strong>{% if r.instrument_name %} <span class="muted">{{ r.instrument_name }}</span>{% endif %}</td>
           <td>{{ r.profile_name }}</td>
           <td>{{ r.describe }}</td>
@@ -51,5 +65,5 @@
     </table>
   </section>
 
-  <p class="muted">编辑顺序/时间:切到「按标的」视图,在对应调度行的「编辑」里修改。</p>
+  <p class="muted">修改时间/类型/档案:切到「按标的」视图,在对应调度行的「编辑」里修改。</p>
 </div>

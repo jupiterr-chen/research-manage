@@ -278,10 +278,28 @@ class TestTimelineView:
             r1 = c.get("/instruments?view=timeline")
             assert r1.status_code == 200
             assert "时间线" in r1.text and "每日交易日" in r1.text
-            assert "0700.HK" in r1.text and ">2<" in r1.text  # seq 列
+            assert "0700.HK" in r1.text and 'value="2"' in r1.text  # seq 行内输入框
             assert "每周" in r1.text
+            # 行内 seq 编辑表单(时间线直接改顺序)
+            assert 'hx-post="/fragments/schedules/1/seq"' in r1.text
+            assert 'id="timeline-block"' in r1.text
+            # tab 选中态差异(精确到 tab 自身,base 导航另有 active)
+            assert 'class="active">时间线</a>' in r1.text
+            assert 'class="active">按标的</a>' not in r1.text
             r2 = c.get("/instruments")
             assert "时间线" in r2.text and 'href="/instruments?view=timeline"' in r2.text
+            assert 'class="active">按标的</a>' in r2.text
+            assert 'class="active">时间线</a>' not in r2.text
             assert 'name="seq"' in r2.text  # 编辑表单含 seq 输入
+            # 行内更新 seq:返回时间线块且顺序生效
+            r3 = c.post("/fragments/schedules/1/seq", data={"seq": "99"})
+            assert r3.status_code == 200 and 'id="timeline-block"' in r3.text
+            assert 'value="99"' in r3.text
+            # 非法 seq:内联错误,不跳转
+            r4 = c.post("/fragments/schedules/1/seq", data={"seq": "abc"})
+            assert r4.status_code == 200 and "flash-error" in r4.text
+            # 不存在的调度:同样内联错误
+            r5 = c.post("/fragments/schedules/999/seq", data={"seq": "1"})
+            assert r5.status_code == 200 and "flash-error" in r5.text
             # 无外链约束延续
             assert "http://" not in r1.text and "https://" not in r1.text

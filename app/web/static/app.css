@@ -280,11 +280,24 @@ th { color: var(--muted); font-weight: 600; }
 .run-title { font-size: 16px; margin: 4px 0 12px; word-break: break-all; }
 .fires { margin: 0; padding-left: 18px; }
 
-/* 时间线视图与视图切换 */
-.view-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+/* 时间线视图与视图切换(选中态实心,未选空心,差异醒目) */
+.view-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .view-tabs a {
-  padding: 4px 14px; border: 1px solid var(--line); border-radius: 16px;
-  color: var(--muted); background: var(--panel);
+  padding: 5px 16px; border: 1px solid var(--line); border-radius: 16px;
+  color: var(--muted); background: var(--panel); text-decoration: none;
 }
-.view-tabs a.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+.view-tabs a:hover { border-color: var(--muted); }
+.view-tabs a.active {
+  color: #fff; background: var(--accent); border-color: var(--accent);
+  font-weight: 600; box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
+}
 .row-disabled td { opacity: 0.55; }
+
+/* 时间线行内顺序编辑 */
+.seq-form { display: inline-flex; gap: 4px; align-items: center; }
+.seq-input { width: 58px; padding: 2px 6px; border: 1px solid var(--line);
+  border-radius: 4px; font: inherit; }
+.seq-form button { padding: 2px 8px; border: 1px solid var(--line);
+  border-radius: 4px; background: var(--panel); color: var(--ink);
+  font: inherit; cursor: pointer; }
+.seq-form button:hover { border-color: var(--accent); color: var(--accent); }
