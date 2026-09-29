@@ -313,6 +313,34 @@ async def delete_schedule(request: Request, schedule_id: int, db=Depends(get_db)
     return _instrument_block(request, db, message="调度已删除")
 
 
+def _timeline_ctx(db, error: str | None = None) -> dict:
+    return {
+        "timeline_rows": sch_srv.timeline(db),
+        "weekday_label": sch_srv.WEEKDAY_LABEL,
+        "error": error,
+    }
+
+
+@router.post("/schedules/{schedule_id}/seq", dependencies=[Depends(auth.require_auth)])
+async def update_schedule_seq(
+    request: Request, schedule_id: int, db=Depends(get_db), seq: str = Form(default="0")
+):
+    """时间线视图行内改顺序;返回刷新后的时间线块。
+
+    seq 收字符串自行转换:非法值走片段内联错误而非 FastAPI 400。
+    """
+    try:
+        seq_value = int(seq.strip())
+        sch_srv.update(db, schedule_id, seq=seq_value, actor=_actor(request))
+    except (ValidationError, ValueError, NotFound) as exc:
+        return templates.TemplateResponse(
+            request=request, name="fragments/timeline_block.html", context=_timeline_ctx(db, error=str(exc))
+        )
+    return templates.TemplateResponse(
+        request=request, name="fragments/timeline_block.html", context=_timeline_ctx(db)
+    )
+
+
 # ---------- 运行详情 ----------
 
 
