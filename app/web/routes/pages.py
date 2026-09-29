@@ -97,7 +97,7 @@ async def overview_page(request: Request, db=Depends(get_db), actor: str = Depen
 
 
 @router.get("/instruments", name="instruments", dependencies=[Depends(auth.require_auth)])
-async def instruments_page(request: Request, db=Depends(get_db)):
+async def instruments_page(request: Request, db=Depends(get_db), view: str = "by-instrument"):
     ctx = _instrument_block_ctx(db, request)
     ctx.update(
         {
@@ -105,6 +105,8 @@ async def instruments_page(request: Request, db=Depends(get_db)):
             "placeholder": False,
             "kind_label": sch_srv.KIND_LABEL,
             "weekday_label": sch_srv.WEEKDAY_LABEL,
+            "view": "timeline" if view == "timeline" else "by-instrument",
+            "timeline_rows": sch_srv.timeline(db),
         }
     )
     return templates.TemplateResponse(request=request, name="instruments.html", context=ctx)

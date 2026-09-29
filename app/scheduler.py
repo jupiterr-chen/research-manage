@@ -72,10 +72,10 @@ class Scheduler:
         conn = self.db_factory()
         try:
             rows = conn.execute(
-                "SELECT s.id, s.profile_id, s.kind, s.at_time, s.weekday, s.enabled,"
+                "SELECT s.id, s.profile_id, s.kind, s.at_time, s.weekday, s.enabled, s.seq,"
                 "       i.code, i.enabled AS inst_enabled"
                 " FROM schedule s JOIN instrument i ON i.id = s.instrument_id"
-                " WHERE s.enabled=1 AND i.enabled=1 ORDER BY s.id"
+                " WHERE s.enabled=1 AND i.enabled=1 ORDER BY s.seq, s.id"
             ).fetchall()
             return [dict(r) for r in rows]
         finally:
@@ -87,7 +87,7 @@ class Scheduler:
         for job in self._scheduler.get_jobs():
             if job.id == RETENTION_JOB_ID or job.id.startswith(JOB_PREFIX):
                 self._scheduler.remove_job(job.id)
-        for s in schedules:  # id 升序注册 → 同 tick 执行顺序 = id 顺序
+        for s in schedules:  # (seq, id) 升序注册 → 同 tick 执行顺序 = (seq, id)
             self._scheduler.add_job(
                 self._fire,
                 trigger=self._trigger_for(s),
@@ -163,9 +163,11 @@ class Scheduler:
                     "schedule_id": s["id"],
                     "code": s["code"],
                     "at": nxt.strftime("%H:%M"),
+                    "seq": s["seq"],
                     "analysts": profiles.get(s["profile_id"], ""),
                 }
             )
+        out.sort(key=lambda x: (x["at"], x["seq"], x["schedule_id"]))
         return out
 
     @property

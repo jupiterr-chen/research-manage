@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block title %}标的与调度{% endblock %}
 {% block content %}
-{% include "fragments/instruments_block.html" %}
+<nav class="view-tabs">
+  <a href="/instruments" class="{% if view != 'timeline' %}active{% endif %}">按标的</a>
+  <a href="/instruments?view=timeline" class="{% if view == 'timeline' %}active{% endif %}">时间线</a>
+</nav>
+{% if view == 'timeline' %}
+  {% include "fragments/timeline_block.html" %}
+{% else %}
+  {% include "fragments/instruments_block.html" %}
+{% endif %}
 {% endblock %}

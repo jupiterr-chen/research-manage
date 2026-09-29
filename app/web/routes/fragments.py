@@ -250,6 +250,7 @@ async def create_schedule(
     kind: str = Form(default="daily_trading"),
     at_time: str = Form(default="08:30"),
     weekday: int | None = Form(default=None),
+    seq: int = Form(default=0),
 ):
     try:
         sch_srv.create(
@@ -259,6 +260,7 @@ async def create_schedule(
             kind=kind,
             at_time=at_time,
             weekday=weekday,
+            seq=seq,
             actor=_actor(request),
         )
     except (ValidationError, ValueError, NotFound) as exc:
@@ -275,6 +277,7 @@ async def update_schedule(
     kind: str | None = Form(default=None),
     at_time: str | None = Form(default=None),
     weekday: int | None = Form(default=None),
+    seq: int | None = Form(default=None),
 ):
     try:
         sch_srv.update(
@@ -284,6 +287,7 @@ async def update_schedule(
             kind=kind,
             at_time=at_time,
             weekday=weekday,
+            seq=seq,
             actor=_actor(request),
         )
     except (ValidationError, ValueError, NotFound) as exc:

@@ -37,7 +37,8 @@ _DDL = [
       kind     TEXT NOT NULL CHECK(kind IN ('daily_trading','weekly')),
       at_time  TEXT NOT NULL DEFAULT '08:30',
       weekday  INTEGER,
-      enabled  INTEGER NOT NULL DEFAULT 1
+      enabled  INTEGER NOT NULL DEFAULT 1,
+      seq      INTEGER NOT NULL DEFAULT 0
     )
     """,
     """
@@ -104,7 +105,7 @@ _DDL = [
 _EXPECTED_COLUMNS: dict[str, list[str]] = {
     "instrument": ["id", "market", "code", "name", "enabled", "created_at", "updated_at"],
     "profile": ["id", "name", "analysts_csv", "is_default"],
-    "schedule": ["id", "instrument_id", "profile_id", "kind", "at_time", "weekday", "enabled"],
+    "schedule": ["id", "instrument_id", "profile_id", "kind", "at_time", "weekday", "enabled", "seq"],
     "report_job": [
         "id",
         "instrument_id",
@@ -195,6 +196,8 @@ def migrate(conn: sqlite3.Connection) -> None:
             for col in columns:
                 if col not in existing:  # pragma: no cover - 仅升级路径触发
                     conn.execute(f'ALTER TABLE {table} ADD COLUMN "{col}"')
+        # 老库补列后回填(seq 通用 ALTER 无法带 DEFAULT)
+        conn.execute("UPDATE schedule SET seq=0 WHERE seq IS NULL")
         # 种子档案:仅首次(表空)写入;不种标的
         count = conn.execute("SELECT COUNT(*) AS n FROM profile").fetchone()["n"]
         if count == 0:

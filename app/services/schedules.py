@@ -19,7 +19,7 @@ KIND_LABEL = {"daily_trading": "每交易日", "weekly": "每周"}
 WEEKDAY_LABEL = {1: "一", 2: "二", 3: "三", 4: "四", 5: "五", 6: "六", 7: "日"}
 _AT_TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
-_COLS = "id, instrument_id, profile_id, kind, at_time, weekday, enabled"
+_COLS = "id, instrument_id, profile_id, kind, at_time, weekday, enabled, seq"
 
 # server 生命周期内注入:写操作后全量重建调度作业
 on_change: Callable[[], None] | None = None
@@ -41,7 +41,9 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     return d
 
 
-def _validate(conn: sqlite3.Connection, *, kind: str, at_time: str, weekday: int | None) -> None:
+def _validate(
+    conn: sqlite3.Connection, *, kind: str, at_time: str, weekday: int | None, seq: int = 0
+) -> None:
     if kind not in KINDS:
         raise ValidationError(f"调度类型 {kind!r} 非法;合法值 {','.join(KINDS)}")
     if not _AT_TIME_RE.match(at_time):
@@ -51,6 +53,8 @@ def _validate(conn: sqlite3.Connection, *, kind: str, at_time: str, weekday: int
             raise ValidationError("周频调度必须指定 weekday(1=周一 … 7=周日)")
     elif weekday is not None:
         raise ValidationError("日频调度不应指定 weekday")
+    if not isinstance(seq, int) or isinstance(seq, bool):
+        raise ValidationError("seq 必须是整数")
 
 
 def create(
@@ -62,18 +66,19 @@ def create(
     at_time: str = "08:30",
     weekday: int | None = None,
     enabled: bool = True,
+    seq: int = 0,
     actor: str,
 ) -> dict:
-    _validate(conn, kind=kind, at_time=at_time, weekday=weekday)
+    _validate(conn, kind=kind, at_time=at_time, weekday=weekday, seq=seq)
     with db.tx(conn):
         if not conn.execute("SELECT 1 FROM instrument WHERE id=?", (instrument_id,)).fetchone():
             raise NotFound(f"标的 id={instrument_id} 不存在")
         if not conn.execute("SELECT 1 FROM profile WHERE id=?", (profile_id,)).fetchone():
             raise NotFound(f"档案 id={profile_id} 不存在")
         cur = conn.execute(
-            "INSERT INTO schedule(instrument_id, profile_id, kind, at_time, weekday, enabled)"
-            " VALUES (?,?,?,?,?,?)",
-            (instrument_id, profile_id, kind, at_time, weekday, int(enabled)),
+            "INSERT INTO schedule(instrument_id, profile_id, kind, at_time, weekday, enabled, seq)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (instrument_id, profile_id, kind, at_time, weekday, int(enabled), seq),
         )
         schedule_id = cur.lastrowid
         audit.audit(
@@ -104,6 +109,7 @@ def update(
     at_time: str | None = None,
     weekday: int | None = None,
     enabled: bool | None = None,
+    seq: int | None = None,
     actor: str,
 ) -> dict:
     with db.tx(conn):
@@ -121,10 +127,11 @@ def update(
             new_weekday = row["weekday"]
         else:
             new_weekday = weekday
-        _validate(conn, kind=new_kind, at_time=new_at, weekday=new_weekday)
-        sets = ["kind=?", "at_time=?", "weekday=?"]
-        params: list = [new_kind, new_at, new_weekday]
-        detail: dict = {"kind": new_kind, "at_time": new_at, "weekday": new_weekday}
+        new_seq = seq if seq is not None else row["seq"]
+        _validate(conn, kind=new_kind, at_time=new_at, weekday=new_weekday, seq=new_seq)
+        sets = ["kind=?", "at_time=?", "weekday=?", "seq=?"]
+        params: list = [new_kind, new_at, new_weekday, new_seq]
+        detail: dict = {"kind": new_kind, "at_time": new_at, "weekday": new_weekday, "seq": new_seq}
         if profile_id is not None:
             if not conn.execute("SELECT 1 FROM profile WHERE id=?", (profile_id,)).fetchone():
                 raise NotFound(f"档案 id={profile_id} 不存在")
@@ -178,8 +185,44 @@ def list_schedules(conn: sqlite3.Connection, *, instrument_id: int | None = None
     if instrument_id is not None:
         sql += " WHERE instrument_id=?"
         params.append(instrument_id)
-    sql += " ORDER BY instrument_id, id"
+    sql += " ORDER BY instrument_id, seq, id"
     return [_row_to_dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
+def timeline(conn: sqlite3.Connection) -> list[dict]:
+    """全量调度的时间线视图数据:按 kind/weekday 分组的扁平行(时间 → seq → id 排序)。
+
+    同刻执行顺序 = (seq, id)(与 scheduler 的注册/入队顺序一致)。
+    """
+    sql = (
+        "SELECT s.id, s.kind, s.at_time, s.weekday, s.enabled, s.seq, s.profile_id,"
+        "       i.id AS instrument_id, i.code, i.name AS instrument_name, i.enabled AS inst_enabled,"
+        "       p.name AS profile_name, p.analysts_csv"
+        " FROM schedule s"
+        " JOIN instrument i ON i.id = s.instrument_id"
+        " JOIN profile p ON p.id = s.profile_id"
+    )
+    rows = []
+    for r in conn.execute(sql).fetchall():
+        d = dict(r)
+        d["enabled"] = bool(d["enabled"])
+        d["inst_enabled"] = bool(d["inst_enabled"])
+        d["describe"] = describe(
+            conn,
+            {
+                "instrument_id": d["instrument_id"],
+                "profile_id": d["profile_id"],
+                "kind": d["kind"],
+                "at_time": d["at_time"],
+                "weekday": d["weekday"],
+                "enabled": d["enabled"],
+            },
+        )
+        rows.append(d)
+    rows.sort(
+        key=lambda d: (d["kind"] != "daily_trading", d["weekday"] or 0, d["at_time"], d["seq"], d["id"])
+    )
+    return rows
 
 
 def describe(conn: sqlite3.Connection, schedule: dict) -> str:
