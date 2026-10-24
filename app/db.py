@@ -9,6 +9,31 @@ import itertools
 import sqlite3
 from contextlib import contextmanager
 
+_REPORT_JOB_DDL = """
+    CREATE TABLE IF NOT EXISTS report_job (        -- 财报原文获取任务(reports-fetcher 对接;本地跟踪记录)
+      id TEXT PRIMARY KEY,                          -- rj-YYYYMMDD-HHMMSS-<slug>
+      instrument_id INTEGER REFERENCES instrument(id),
+      market TEXT NOT NULL CHECK(market IN ('us','hk','cn')),
+      code TEXT NOT NULL,                           -- 本系统代码(1810.HK)
+      symbol TEXT NOT NULL,                         -- 提交给 reports-fetcher 的 symbol
+      last_n INTEGER NOT NULL DEFAULT 4,
+      refresh INTEGER NOT NULL DEFAULT 0,
+      idempotency_key TEXT NOT NULL UNIQUE,         -- 创建时生成,所有重试复用
+      remote_job_id TEXT,                           -- 服务端 job_id(提交成功后)
+      status TEXT NOT NULL CHECK(status IN
+        ('pending','queued','running','succeeded','partial','failed','timeout','error')),
+      trigger TEXT NOT NULL CHECK(trigger IN ('web','api','schedule')),
+      submit_attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT,                         -- 429 Retry-After 后的下次提交时间
+      progress_json TEXT, summary_json TEXT, results_json TEXT,
+      warnings_json TEXT,                           -- 汇总的证券级 warnings
+      report_ids_json TEXT,                         -- 可用报告 id 列表(partial 也保留)
+      error TEXT, error_code TEXT, error_retryable INTEGER,
+      created_at TEXT NOT NULL, started_at TEXT, finished_at TEXT, updated_at TEXT NOT NULL
+    )
+"""
+
+
 _DDL = [
     """
     CREATE TABLE IF NOT EXISTS instrument (
@@ -80,7 +105,7 @@ _DDL = [
       remote_job_id TEXT,                           -- 服务端 job_id(提交成功后)
       status TEXT NOT NULL CHECK(status IN
         ('pending','queued','running','succeeded','partial','failed','timeout','error')),
-      trigger TEXT NOT NULL CHECK(trigger IN ('web','api')),
+      trigger TEXT NOT NULL CHECK(trigger IN ('web','api','schedule')),
       submit_attempts INTEGER NOT NULL DEFAULT 0,
       next_attempt_at TEXT,                         -- 429 Retry-After 后的下次提交时间
       progress_json TEXT, summary_json TEXT, results_json TEXT,
@@ -198,6 +223,23 @@ def migrate(conn: sqlite3.Connection) -> None:
                     conn.execute(f'ALTER TABLE {table} ADD COLUMN "{col}"')
         # 老库补列后回填(seq 通用 ALTER 无法带 DEFAULT)
         conn.execute("UPDATE schedule SET seq=0 WHERE seq IS NULL")
+        # report_job.trigger CHECK 扩 'schedule':SQLite 不能 ALTER CHECK,幂等重建换表
+        ddl = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='report_job'"
+        ).fetchone()
+        if ddl and "'schedule'" not in ddl[0]:
+            # 索引名随老表保留,DROP 后需按新表重建
+            conn.execute("DROP INDEX IF EXISTS idx_report_job_status")
+            conn.execute("ALTER TABLE report_job RENAME TO report_job_old_migrate")
+            conn.execute(_REPORT_JOB_DDL)
+            # 显式列名:老库列序可能与此处 DDL 不同,按名搬运
+            _cols = [r[1] for r in conn.execute("PRAGMA table_info(report_job)")]
+            conn.execute(
+                f"INSERT INTO report_job ({','.join(_cols)})"
+                f" SELECT {','.join(_cols)} FROM report_job_old_migrate"
+            )
+            conn.execute("DROP TABLE report_job_old_migrate")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_report_job_status ON report_job(status)")
         # 种子档案:仅首次(表空)写入;不种标的
         count = conn.execute("SELECT COUNT(*) AS n FROM profile").fetchone()["n"]
         if count == 0:

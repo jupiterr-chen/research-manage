@@ -78,7 +78,7 @@ def create(
     n = default_last_n if last_n is None else int(last_n)
     if not 1 <= n <= MAX_LAST_N:
         raise ValidationError(f"last_n 必须在 1..{MAX_LAST_N}")
-    if trigger not in ("web", "api"):
+    if trigger not in ("web", "api", "schedule"):
         raise ValidationError("trigger 非法")
     with db.tx(conn):
         active = conn.execute(
@@ -291,3 +291,60 @@ def reopen_for_refresh(conn, job_id: str, actor: str) -> dict:
         )
         audit.audit(conn, actor, "refresh", "report_job", job_id, None)
     return get(conn, job_id)
+
+
+# ---------------------------------------------------------------- 定时增量同步(v1.2)
+def backfilled_instrument_ids(conn: sqlite3.Connection) -> set[int]:
+    """已回填的标的:存在 ≥1 条 succeeded/partial 任务(任何 trigger)。"""
+    rows = conn.execute(
+        "SELECT DISTINCT instrument_id FROM report_job"
+        " WHERE instrument_id IS NOT NULL AND status IN ('succeeded','partial')"
+    ).fetchall()
+    return {r["instrument_id"] for r in rows}
+
+
+def sync_candidates(conn: sqlite3.Connection) -> list[dict]:
+    """每日增量的候选:启用标的 + 已回填 + 当前无活动任务(按 instrument.id 序)。
+    前提「第一遍已执行」由 backfilled 表达;未回填的跳过(等回填,不自动补)。"""
+    backfilled = backfilled_instrument_ids(conn)
+    active = {
+        r["instrument_id"]
+        for r in conn.execute(
+            "SELECT DISTINCT instrument_id FROM report_job"
+            " WHERE instrument_id IS NOT NULL AND status IN ('pending','queued','running')"
+        )
+    }
+    out = []
+    for r in conn.execute("SELECT id, market, code FROM instrument WHERE enabled=1 ORDER BY id").fetchall():
+        if r["id"] not in backfilled or r["id"] in active:
+            continue
+        out.append(dict(r))
+    return out
+
+
+def create_sync_jobs(
+    conn: sqlite3.Connection,
+    *,
+    settings,
+    actor: str = "schedule",
+) -> list[dict]:
+    """为全部候选标的创建增量任务(last_n=REPORTS_SYNC_LAST_N,refresh=True)。
+    返回创建成功的任务列表;单个失败(如校验错)跳过并继续。"""
+    jobs = []
+    for cand in sync_candidates(conn):
+        try:
+            jobs.append(
+                create(
+                    conn,
+                    code=cand["code"],
+                    market=cand["market"],
+                    last_n=settings.reports_sync_last_n,
+                    refresh=True,
+                    trigger="schedule",
+                    actor=actor,
+                    default_last_n=settings.reports_last_n_default,
+                )
+            )
+        except (ConflictError, ValidationError):
+            continue  # 竞态(他人刚建)或标的被删,跳过
+    return jobs

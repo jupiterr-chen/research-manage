@@ -60,6 +60,10 @@ class Settings:
     reports_poll_interval: float = 2.0  # 轮询起始间隔(秒),退避至 poll_max
     reports_poll_max_interval: float = 10.0
     reports_last_n_default: int = 4
+    # v1.2 定时增量 + 新标的引导(docs/REPORTS-FETCHER.md §9)
+    reports_sync_at: str = "06:00"  # 每日增量同步时刻(Asia/Shanghai)
+    reports_sync_last_n: int = 2  # 增量检查的 last_n(refresh=true)
+    reports_backfill_last_n_default: int = 12  # 新标的引导弹窗默认期数
 
     @classmethod
     def load(cls, env: dict[str, str] | None = None) -> Settings:
@@ -117,6 +121,9 @@ class Settings:
             reports_poll_interval=to_float("REPORTS_API_POLL_INTERVAL", 2.0),
             reports_poll_max_interval=to_float("REPORTS_API_POLL_MAX_INTERVAL", 10.0),
             reports_last_n_default=to_int("REPORTS_API_LAST_N_DEFAULT", 4),
+            reports_sync_at=get("REPORTS_SYNC_AT", "06:00").strip(),
+            reports_sync_last_n=to_int("REPORTS_SYNC_LAST_N", 2),
+            reports_backfill_last_n_default=to_int("REPORTS_BACKFILL_LAST_N_DEFAULT", 12),
         )
         if parse_errors:
             for line in parse_errors:
@@ -168,6 +175,16 @@ class Settings:
         ):
             if val <= 0:
                 errors.append(f"{name}={val} 必须 >0")
+        import re as _re
+
+        if not _re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", self.reports_sync_at):
+            errors.append(f"REPORTS_SYNC_AT={self.reports_sync_at!r} 应为 HH:MM")
+        for name, val in (
+            ("REPORTS_SYNC_LAST_N", self.reports_sync_last_n),
+            ("REPORTS_BACKFILL_LAST_N_DEFAULT", self.reports_backfill_last_n_default),
+        ):
+            if not 1 <= val <= 20:
+                errors.append(f"{name}={val} 必须在 1..20")
         if not 1 <= self.reports_last_n_default <= 20:
             errors.append("REPORTS_API_LAST_N_DEFAULT 必须在 1..20")
         if errors:
@@ -206,6 +223,9 @@ class Settings:
             "tz": self.tz,
             "token": "(已配置)" if self.token else "(未配置,仅限回环绑定)",
             "reports_base_url": self.reports_base_url or "(未配置,财报获取功能关闭)",
+            "reports_sync_at": self.reports_sync_at,
+            "reports_sync_last_n": self.reports_sync_last_n,
+            "reports_backfill_last_n_default": self.reports_backfill_last_n_default,
             "reports_token": "(已配置)" if self.reports_token else "(无)",
             "reports_timeout": self.reports_timeout,
             "reports_max_wait": self.reports_max_wait,
