@@ -1,7 +1,7 @@
 # 验收记录 2026-10-24 · 财报定时增量 + 新标的引导(v1.2)
 
 - 执行者:开发 agent(feat/reports-sync)
-- 代码版本:feat/reports-sync @ <本次提交>(基于 develop b3642f2)
+- 代码版本:feat/reports-sync @ d0f9752(合入 develop e9fea6b)
 - 环境:单测(本地)/ 生产(NAS agents-manage + reports-fetcher)
 
 ## 交付范围
@@ -20,14 +20,15 @@
 - ruff:check 与 format --check 零告警
 - 生产验证:见下(部署后回填)
 
-## 生产验证(部署后回填此节)
+## 生产验证(NAS,2026-10-24 部署当日)
 
-- [ ] 迁移:启动后 `PRAGMA table_info(report_job)` 无异常,既有 13 条任务数据保留
-- [ ] `am-reports-sync` 作业注册(healthz scheduler_jobs +1,或 get_job 核对)
-- [ ] 新增测试标的 → 引导卡出现 → 立即同步 n=3 → /reports 出现任务
-- [ ] 次日 06:00 增量批:全部已回填标的各一条 trigger=schedule 任务,refresh=true
-- [ ] 回填驱动 `/tmp/backfill_reports.log` 7/7 终态
+- [x] 迁移:启动正常,既有 20 条 report_job 数据保留;`trigger='schedule'` 可插入
+- [x] `am-reports-sync` 作业已注册(healthz scheduler_jobs=32;get_job 核对 registered=True)
+- [x] 新增测试标的 TSLA → 引导卡出现(默认 12)→ 立即同步 n=3 → 任务创建、卡片消失(验证后已清理测试数据)
+- [x] 回填驱动 7/7 终态:`/tmp/backfill_reports.log` 全部 succeeded,各 12 份报告
+      (NVDA/688981/688825/688836/GOOG/SPCX/300308,downloaded=12;300308 有 1 条 coverage 提示属正常)
+- [ ] 次日 06:00 增量批(待 2026-10-25 自然触发后核对:全部已回填标的各一条 trigger=schedule)
 
 ## 结论
 
-(待生产验证后回填:可上线/不可上线)
+可上线(自动化验收全绿;唯一待观察项为次日增量批的自然触发,机制与手工任务完全同链路)
