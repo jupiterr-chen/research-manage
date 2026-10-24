@@ -185,3 +185,34 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 - **v1 不做定时获取**:只有页面/API 手工发起(`trigger ∈ {web, api}`),没有调度集成。
 - **下载文件名以上游为准且形态不稳定**:上游 `Content-Disposition` 可能是 `unknown__…`(缺代码、`report_period=null`)或只给 ASCII;管理台优先转发可读名,否则用本系统元数据组装回退名并始终给出 `filename*`,不修改上游文件本身。元数据(`get_report`)取不到时退化为 `<report_id>.<ext>`,不影响下载。
 - 依赖 `integration-kit` 契约(reports-fetcher v1.0.1);契约变更需同步升级客户端。
+
+## 9. v1.2 定时增量与新增标的引导
+
+> 设计细节见 [DESIGN.md §4.13](DESIGN.md);本节是运维/使用视角。
+
+### 9.1 一次回填(手工/引导)
+
+每个标的做一次「回填」:`/reports` 页提交 last_n=12(或新增标的时的引导卡)。回填完成的判据是该标的
+存在 ≥1 条 succeeded/partial 任务。回填只做一次——之后的更新交给每日增量。
+
+### 9.2 每日增量(自动)
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `REPORTS_SYNC_AT` | `06:00` | 每日增量时刻(Asia/Shanghai);功能未配置时不注册作业 |
+| `REPORTS_SYNC_LAST_N` | `2` | 增量检查窗口;refresh=true,重复内容命中缓存,无新报告时零下载 |
+
+行为:到点后为「启用 ∧ 已回填 ∧ 无活动任务」的每个标的创建 `trigger=schedule` 任务;
+未回填的新标的不会自动补历史(等你手动回填或用引导卡);同标的有活动任务时跳过。
+任务与结果照常出现在 `/reports` 任务列表,审计 actor=schedule。
+
+### 9.3 新增标的引导
+
+在「标的与调度」页新增标的后,页面顶部出现蓝色引导卡:「是否同步最新财报?」期数默认
+`REPORTS_BACKFILL_LAST_N_DEFAULT`(12),可改 1..20;「立即同步」创建回填任务,「跳过」仅收起卡片。
+`REPORTS_API_BASE_URL` 未配置时不出现该卡(功能整体关闭)。
+
+### 9.4 升级注意(v1.1 → v1.2)
+
+- `report_job.trigger` 新增 `schedule` 值:启动时自动幂等迁移(换表重建,数据保留);升级后首次启动稍慢属正常。
+- 新增三个 `REPORTS_*` 环境变量,均有默认值,不改也能跑。

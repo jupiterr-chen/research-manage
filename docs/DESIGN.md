@@ -308,6 +308,32 @@ htmx 约定:片段接口只返回 `<div id=...>` 可 `hx-swap="outerHTML"` 的�
 页面徽标按 `reachable`/`ready` 判定:`reachable=false` → 不可达;`ready=false` → 未就绪;`ready=true` → 正常;
 二者未知 → 未探测(文案说明等待首次探测)。`last_probe_at`/`probe_error` 经 `scrub` 后由 Jinja 自动转义渲染。
 
+### 4.13 财报定时增量与新增标的引导(v1.2)
+
+**回填状态(derived,无新表)**:标的视为「已回填」= 存在 ≥1 条 `status ∈ {succeeded, partial}` 的
+report_job(任何 trigger)。`failed/timeout/error` 不算——失败的回填不解锁增量。
+
+**每日增量(`app/reports/sync.py` + Scheduler)**:
+- Scheduler 注册 cron 作业 `am-reports-sync`(时刻 = `REPORTS_SYNC_AT`,默认 06:00,Asia/Shanghai;
+  功能未配置时不注册)。触发只做一件事:为全部候选创建本地 report_job,`trigger=schedule、
+  last_n=REPORTS_SYNC_LAST_N(默认 2)、refresh=true`,实际抓取/轮询完全复用既有 ReportsPoller——
+  本模块不发 HTTP。
+- 候选 = 启用标的 ∧ 已回填 ∧ 当前无活动任务(按 instrument.id 序);未回填的跳过(等回填,不自动补)。
+- 增量语义:fetcher 的 `refresh=true` 会重新验证候选并只下载新版本,旧版本保留;`last_n=2` 覆盖
+  「最新一期刚发布 + 上一期」的常见窗口,重复内容命中缓存(summary.cached)零成本。
+
+**新标的引导(`fragments/instruments/{id}/report-sync*`)**:
+- 新增标的成功且 `reports_enabled` 时,标的页顶部渲染引导卡(蓝色高亮弹卡):「是否同步最新财报?」
+  期数输入框默认 `REPORTS_BACKFILL_LAST_N_DEFAULT`(12,可调 1..20)。
+- 「立即同步」→ 创建回填任务(trigger=web, refresh=false);「跳过」→ 仅移除卡片;两者都整块刷新。
+- 功能未配置时不出现引导,静默降级。
+
+**迁移**:`report_job.trigger` CHECK 扩 `'schedule'`——SQLite 无法 ALTER CHECK,migrate 幂等换表
+(重命名→按新 DDL 建表→按列名搬数据→删旧→重建 `idx_report_job_status`);老库列序不依赖 `SELECT *`。
+
+**配置**(`app/config.py`):`REPORTS_SYNC_AT`(HH:MM)、`REPORTS_SYNC_LAST_N`(1..20)、
+`REPORTS_BACKFILL_LAST_N_DEFAULT`(1..20);validate 拒绝非法值,均入 `summary()`。
+
 ## 5. 状态机
 
 ```

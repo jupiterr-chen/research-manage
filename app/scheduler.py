@@ -24,12 +24,14 @@ from apscheduler.triggers.cron import CronTrigger
 from app import models, services
 from app.config import Settings
 from app.executor import retention
+from app.reports import sync as reports_sync
 
 log = logging.getLogger("am.scheduler")
 
 SH_TZ = ZoneInfo("Asia/Shanghai")
 JOB_PREFIX = "am-sched-"
 RETENTION_JOB_ID = "am-retention"
+REPORTS_SYNC_JOB_ID = "am-reports-sync"
 RETENTION_AT = (3, 30)  # 每日 03:30(R-EXE-11)
 
 
@@ -101,6 +103,18 @@ class Scheduler:
             id=RETENTION_JOB_ID,
             replace_existing=True,
         )
+        # v1.2 每日财报增量同步(功能未配置时不注册)
+        if self.settings.reports_enabled:
+            hour, minute = reports_sync.parse_sync_at(self.settings.reports_sync_at)
+            self._scheduler.add_job(
+                self._fire_reports_sync,
+                trigger=CronTrigger(hour=hour, minute=minute, timezone=SH_TZ),
+                id=REPORTS_SYNC_JOB_ID,
+                replace_existing=True,
+            )
+        else:
+            if self._scheduler.get_job(REPORTS_SYNC_JOB_ID) is not None:
+                self._scheduler.remove_job(REPORTS_SYNC_JOB_ID)
         return len(schedules)
 
     @staticmethod
@@ -124,6 +138,15 @@ class Scheduler:
                 log.info("[scheduler] 调度 %s 入队 run=%s", schedule_id, run["id"])
         except Exception:  # noqa: BLE001 - 单个调度失败不影响调度器
             log.exception("[scheduler] 调度 %s 入队失败", schedule_id)
+        finally:
+            conn.close()
+
+    def _fire_reports_sync(self) -> None:
+        conn = self.db_factory()
+        try:
+            reports_sync.run_daily_sync(self.settings, self.db_factory)
+        except Exception:  # noqa: BLE001 - 单次同步失败不影响调度器
+            log.exception("[scheduler] 财报增量同步失败")
         finally:
             conn.close()
 

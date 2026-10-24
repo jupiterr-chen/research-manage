@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from app import models
 from app.services import instruments as inst_srv
 from app.services import profiles as prof_srv
+from app.services import report_jobs as rj_srv
 from app.services import runs as runs_srv
 from app.services import schedules as sch_srv
 from app.services.errors import (
@@ -180,14 +181,18 @@ def _instrument_block_ctx(db, request, message=None, error=None) -> dict:
         "weekday_label": sch_srv.WEEKDAY_LABEL,
         "message": message,
         "error": error,
+        "sync_prompt": None,
     }
 
 
 def _instrument_block(request: Request, db, **kw):
+    prompt = kw.pop("sync_prompt", None)
+    ctx = _instrument_block_ctx(db, request, **kw)
+    ctx["sync_prompt"] = prompt
     return templates.TemplateResponse(
         request=request,
         name="fragments/instruments_block.html",
-        context=_instrument_block_ctx(db, request, **kw),
+        context=ctx,
     )
 
 
@@ -200,10 +205,14 @@ async def create_instrument(
     name: str = Form(default=""),
 ):
     try:
-        inst_srv.create(db, market=market, code=code, name=name, actor=_actor(request))
+        inst = inst_srv.create(db, market=market, code=code, name=name, actor=_actor(request))
     except (ValidationError, ValueError, ConflictError) as exc:
         return _instrument_block(request, db, error=str(exc))
-    return _instrument_block(request, db, message=f"已添加标的 {code.strip().upper()}")
+    settings = request.app.state.settings
+    prompt = None
+    if settings.reports_enabled and inst["enabled"]:
+        prompt = {"instrument": inst, "default_last_n": settings.reports_backfill_last_n_default}
+    return _instrument_block(request, db, message=f"已添加标的 {code.strip().upper()}", sync_prompt=prompt)
 
 
 @router.post("/instruments/{instrument_id}", dependencies=[Depends(auth.require_auth)])
@@ -236,6 +245,52 @@ async def delete_instrument(request: Request, instrument_id: int, db=Depends(get
     except NotFound as exc:
         return _instrument_block(request, db, error=str(exc))
     return _instrument_block(request, db, message="标的已删除")
+
+
+# ---------- 新标的财报引导(v1.2) ----------
+
+
+@router.post("/instruments/{instrument_id}/report-sync", dependencies=[Depends(auth.require_auth)])
+async def instrument_report_sync(
+    request: Request,
+    instrument_id: int,
+    db=Depends(get_db),
+    last_n: str = Form(default=""),
+):
+    """引导卡「立即同步」:按输入期数创建回填任务(trigger=web)。"""
+    settings = request.app.state.settings
+    try:
+        inst = inst_srv.get(db, instrument_id)
+    except NotFound as exc:
+        return _instrument_block(request, db, error=str(exc))
+    if not settings.reports_enabled:
+        return _instrument_block(request, db, error="未配置 REPORTS_API_BASE_URL,财报获取功能关闭")
+    raw = (last_n or "").strip()
+    n = settings.reports_backfill_last_n_default if not raw else int(raw)
+    try:
+        job = rj_srv.create(
+            db,
+            code=inst["code"],
+            market=inst["market"],
+            last_n=n,
+            refresh=False,
+            trigger="web",
+            actor=_actor(request),
+            default_last_n=settings.reports_last_n_default,
+        )
+    except (rj_srv.ValidationError, ValueError, rj_srv.ConflictError) as exc:
+        return _instrument_block(request, db, error=str(exc))
+    return _instrument_block(
+        request,
+        db,
+        message=(f"已创建财报任务 {job['id']}:{inst['code']} 最近 {job['last_n']} 期,进度见「财报原文」页"),
+    )
+
+
+@router.post("/instruments/{instrument_id}/report-sync-dismiss", dependencies=[Depends(auth.require_auth)])
+async def instrument_report_sync_dismiss(request: Request, instrument_id: int, db=Depends(get_db)):
+    """引导卡「跳过」。"""
+    return _instrument_block(request, db)
 
 
 # ---------- 调度 ----------

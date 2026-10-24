@@ -3,6 +3,23 @@
   {% if message %}<p class="flash-ok">{{ message }}</p>{% endif %}
   {% if error %}<p class="flash-error">{{ error }}</p>{% endif %}
 
+  {% if sync_prompt %}
+  <section class="card sync-prompt" id="sync-prompt">
+    <h2>是否同步最新财报?{{ sync_prompt.instrument.code }}</h2>
+    <p class="muted">{{ sync_prompt.instrument.code }}{% if sync_prompt.instrument.name %}({{ sync_prompt.instrument.name }}){% endif %}
+      刚添加,还没有拉取过财报原文。可立即回填最近若干期,供研报引用。</p>
+    <form hx-post="/fragments/instruments/{{ sync_prompt.instrument.id }}/report-sync"
+          hx-target="#instruments-block" hx-swap="outerHTML" class="form-row">
+      <label>期数
+        <input type="number" name="last_n" value="{{ sync_prompt.default_last_n }}" min="1" max="20" style="width:80px">
+      </label>
+      <button type="submit" class="primary">立即同步</button>
+      <button hx-post="/fragments/instruments/{{ sync_prompt.instrument.id }}/report-sync-dismiss"
+              hx-target="#instruments-block" hx-swap="outerHTML" type="button">跳过</button>
+    </form>
+  </section>
+  {% endif %}
+
   <section class="card">
     <h2>新增标的</h2>
     <form hx-post="/fragments/instruments" hx-target="#instruments-block" hx-swap="outerHTML" class="form-row">
