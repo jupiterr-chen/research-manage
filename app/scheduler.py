@@ -32,6 +32,7 @@ SH_TZ = ZoneInfo("Asia/Shanghai")
 JOB_PREFIX = "am-sched-"
 RETENTION_JOB_ID = "am-retention"
 REPORTS_SYNC_JOB_ID = "am-reports-sync"
+REPORTS_SYNC_WEEKDAY = 0  # 周一(用户 2026-10-25 指令:每周一检查增量)
 RETENTION_AT = (3, 30)  # 每日 03:30(R-EXE-11)
 
 
@@ -108,7 +109,8 @@ class Scheduler:
             hour, minute = reports_sync.parse_sync_at(self.settings.reports_sync_at)
             self._scheduler.add_job(
                 self._fire_reports_sync,
-                trigger=CronTrigger(hour=hour, minute=minute, timezone=SH_TZ),
+                trigger=CronTrigger(day_of_week=REPORTS_SYNC_WEEKDAY,
+                                    hour=hour, minute=minute, timezone=SH_TZ),
                 id=REPORTS_SYNC_JOB_ID,
                 replace_existing=True,
             )

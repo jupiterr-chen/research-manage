@@ -122,7 +122,7 @@ class Settings:
             reports_poll_max_interval=to_float("REPORTS_API_POLL_MAX_INTERVAL", 10.0),
             reports_last_n_default=to_int("REPORTS_API_LAST_N_DEFAULT", 4),
             reports_sync_at=get("REPORTS_SYNC_AT", "06:00").strip(),
-            reports_sync_last_n=to_int("REPORTS_SYNC_LAST_N", 2),
+            reports_sync_last_n=to_int("REPORTS_SYNC_LAST_N", 12),
             reports_backfill_last_n_default=to_int("REPORTS_BACKFILL_LAST_N_DEFAULT", 12),
         )
         if parse_errors:
