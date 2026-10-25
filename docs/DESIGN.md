@@ -314,10 +314,11 @@ htmx 约定:片段接口只返回 `<div id=...>` 可 `hx-swap="outerHTML"` 的�
 report_job(任何 trigger)。`failed/timeout/error` 不算——失败的回填不解锁增量。
 
 **每日增量(`app/reports/sync.py` + Scheduler)**:
-- Scheduler 注册 cron 作业 `am-reports-sync`(时刻 = `REPORTS_SYNC_AT`,默认 06:00,Asia/Shanghai;
-  功能未配置时不注册)。触发只做一件事:为全部候选创建本地 report_job,`trigger=schedule、
-  last_n=REPORTS_SYNC_LAST_N(默认 2)、refresh=true`,实际抓取/轮询完全复用既有 ReportsPoller——
-  本模块不发 HTTP。
+- Scheduler 注册 cron 作业 `am-reports-sync`(**每周一**,时刻 = `REPORTS_SYNC_AT`,默认 06:00,
+  Asia/Shanghai;功能未配置时不注册;2026-10-25 用户指令由每日改为每周一)。触发只做一件事:
+  为全部候选创建本地 report_job,`trigger=schedule、last_n=REPORTS_SYNC_LAST_N(默认 12)、
+  refresh=true`,实际抓取/轮询完全复用既有 ReportsPoller——本模块不发 HTTP。
+  增量语义:有新财报 → 下载;无 → 全部命中缓存零成本结束(partial 为合法终态,保留可用文件)。
 - 候选 = 启用标的 ∧ 已回填 ∧ 当前无活动任务(按 instrument.id 序);未回填的跳过(等回填,不自动补)。
 - 增量语义:fetcher 的 `refresh=true` 会重新验证候选并只下载新版本,旧版本保留;`last_n=2` 覆盖
   「最新一期刚发布 + 上一期」的常见窗口,重复内容命中缓存(summary.cached)零成本。

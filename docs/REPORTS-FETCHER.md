@@ -199,10 +199,10 @@ docker compose -f deploy/docker-compose.local.yml --profile reports up -d
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `REPORTS_SYNC_AT` | `06:00` | 每日增量时刻(Asia/Shanghai);功能未配置时不注册作业 |
-| `REPORTS_SYNC_LAST_N` | `2` | 增量检查窗口;refresh=true,重复内容命中缓存,无新报告时零下载 |
+| `REPORTS_SYNC_AT` | `06:00` | **每周一**增量时刻(Asia/Shanghai,2026-10-25 用户指令由每日改为每周一);功能未配置时不注册作业 |
+| `REPORTS_SYNC_LAST_N` | `12` | 增量检查窗口;refresh=true,重复内容命中缓存,无新报告时零下载 |
 
-行为:到点后为「启用 ∧ 已回填 ∧ 无活动任务」的每个标的创建 `trigger=schedule` 任务;
+行为:**每周一**到点后为「启用 ∧ 已回填 ∧ 无活动任务」的每个标的创建 `trigger=schedule` 任务;
 未回填的新标的不会自动补历史(等你手动回填或用引导卡);同标的有活动任务时跳过。
 任务与结果照常出现在 `/reports` 任务列表,审计 actor=schedule。
 

@@ -179,7 +179,7 @@ class TestSchedulerRegistration:
         assert job is not None
         fields = {f.name: str(f) for f in job.trigger.fields}
         assert fields.get("hour") == "6" and fields.get("minute") == "0"
-        assert fields.get("day_of_week") == "*"
+        assert fields.get("day_of_week") == "0"  # 每周一
 
     def test_custom_time_and_disabled(self, env, make_settings):
         s, conn, _ = env
